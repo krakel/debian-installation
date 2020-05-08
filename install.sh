@@ -195,8 +195,8 @@ if [[ ! -z "$DO_SOURCE" ]]; then
   if [[ ! -f $ORIGINAL ]]; then
     mv $SOURCES $ORIGINAL
   fi
-
   mv $TMPFILE $SOURCES
+
   cat <<- EOT > /etc/apt/preferences.d/debian-sid
 	Package: *
 	Pin: release n=testing
@@ -459,7 +459,7 @@ if [[ ! -z "$DO_LUTRIS" ]]; then
   find /usr -iname "libgamemode*"
   LUTRIS_PRE=$(find /usr -iname "libgamemode*" | grep auto | head -1)
   echo
-  echo "add to Lutris preferences and try other if not working (I don't if needed)"
+  echo "add to Lutris preferences and try other if not working (I don't know if needed)"
   echo "LD_PRELOAD    = $LUTRIS_PRE"
   echo "mesa_glthread = true"
 fi
@@ -476,8 +476,6 @@ fi
 if [[ ! -z "$DO_DOT_NET" ]]; then
   echo '######### install .Net'
   apt install winetricks
-  # sudo -u $SUDO_USER wget -P Downloads 'https://raw.githubusercontent.com/Winetricks/winetricks/master/src/winetricks'
-  # chmod +x Downloads/winetricks
   env WINEPREFIX=winedotnet wineboot --init
   env WINEPREFIX=winedotnet winetricks dotnet461 corefonts
 fi
@@ -558,10 +556,10 @@ if [[ ! -z "$DO_CUDA_TEXT" ]]; then
 
   find /usr -name 'libpython3.*so*' 2>/dev/null
   echo
-  echo "at CudaText change user.jon and try other if not working"
+  echo "at CudaText..<options>..<Settings - user> change entry 'pylib__linux' and try other if not working"
   echo "\"pylib__linux\" : \"$(basename $PHYLIB)\""
   echo
-  echo "install with <Plugins><Addon Manager> 'Highlight Occurrences'"
+  echo "install with <Plugins><Addon Manager> 'Highlight Occurrences' if you want"
 fi
 
 #####################################################################
@@ -590,11 +588,12 @@ if [[ ! -z "$DO_KVM" ]]; then
   apt install libvirt-clients libvirt-daemon libvirt-daemon-system
   apt install libguestfs-tools libosinfo-bin bridge-utils geinisoimage
   apt install virtinst virt-viewer virt-manager
+
   add_export_env '.bashrc' 'LIBVIRT_DEFAULT_URI' 'qemu:///system'
   add_export_env '.zshrc'  'LIBVIRT_DEFAULT_URI' 'qemu:///system'
 
   systemctl status libvirtd
-  # systemctl start libvirtd
+#  systemctl start libvirtd
 
   adduser $SUDO_USER libvirt
   adduser $SUDO_USER libvirt-qemu
@@ -605,6 +604,7 @@ if [[ ! -z "$DO_KVM" ]]; then
 
   reboot_now
 
+# old try
 #  apt install qemu qemu-system qemu-utils
 #  apt install geinisoimage
 #  apt install libguestfs-tools libosinfo-bin
@@ -778,6 +778,8 @@ if [[ ! -z "$DO_JAVA" ]]; then
 fi
 
 #####################################################################
+######### Firefox + Thunderbird
+
 function copy_profile() {
   PROFILE_OLD=$1
   PROFILE_INI=$2
@@ -800,8 +802,6 @@ function copy_profile() {
   fi
 }
 
-#####################################################################
-######### Firefox + Thunderbird
 if [[ ! -z "$DO_MOZILLA" ]]; then
   echo '######### install Firefox + Thunderbird'
   apt install mozilla-firefox
@@ -839,8 +839,8 @@ if [[ ! -z "$DO_SAMBA" ]]; then
   chown samba-public $SAMBA_PUBLIC
   chmod u+rwx $SAMBA_PUBLIC
   SAMBA_CONF='/etc/samba/smb.conf'
-  if ! grep -E -q 'path = $SAMBA_PUBLIC' $SAMBA_CONF ; then
-    cat <<- 'EOT' | sudo -u $SUDO_USER tee -a $SAMBA_CONF > /dev/null
+  if ! grep -E -q "path = $SAMBA_PUBLIC" $SAMBA_CONF ; then
+    cat <<- EOT | sudo -u $SUDO_USER tee -a $SAMBA_CONF > /dev/null
 		[public]
 		  path = $SAMBA_PUBLIC
 		  available = yes
@@ -850,6 +850,7 @@ if [[ ! -z "$DO_SAMBA" ]]; then
 		  force user = samba-public
 		EOT
   fi
+
   testparm
   if [[ "$?" == "0" ]]; then
     systemctl restart smbd
