@@ -48,7 +48,7 @@ if [[ -z "$VALUE" ]]; then
   echo
   echo "Flags:"
   echo "-help    	this help"
-  echo "-test    	only srcipt tests"
+  echo "-test    	only script tests"
   echo
   echo "-src     	debian testing (use this first)"
   echo
@@ -68,7 +68,7 @@ if [[ -z "$VALUE" ]]; then
   echo "-discord  	Discord"
   echo "-dream    	Dreambox Edit"
   echo "-java    	java 8+11 jdk"
-  echo "-kvm     	KVM, QEMU with Virt-Manager (better as VirtualBox)"
+  echo "-kvm     	KVM, QEMU with Virt-Manager (better than VirtualBox)"
   echo "-moka    	nice icon set"
   echo "-mozilla   	Firefox + Thunderbird"
   echo "-multimc   	Minecraft MultiMC"
@@ -77,7 +77,7 @@ if [[ -z "$VALUE" ]]; then
   echo "-samba   	Samba - access to Windows"
   echo "-screen     XScreensaver"
   echo "-spotify   	Spotify - some music"
-  echo "-twitch    	twitch gui + LideoLan + Chatty"
+  echo "-twitch    	twitch gui + VideoLan + Chatty"
   echo "-virtual 	VirtualBox with SID library (removed from debian testing)"
   exit
 fi
@@ -721,7 +721,7 @@ if [[ ! -z "$DO_ANBOX" ]]; then
 fi
 
 #####################################################################
-######### twitch gui + LideoLan + Chatty
+######### twitch gui + VideoLan + Chatty
 # https://www.videolan.org
 # https://github.com/streamlink/streamlink-twitch-gui
 # https://www.hiroom2.com/2018/05/27/ubuntu-1804-twitch-en/
