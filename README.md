@@ -5,7 +5,7 @@ It contains some steps I need to initialize a new system and all packages I will
 
 ## run options
 
-After a new installaion you need to run the script without sudo. This option add the user to the sudoer group. You need logout to apply the changes!
+After a new installaion you need to run the script without sudo. This option add the user to the sudoer group. You need logout to apply these change!
 
 ```
 ./install.sh -su
@@ -23,24 +23,24 @@ sudo ./install.sh -FLAG
 | ---- | ----------- | ------- |
 | help | this help | |
 | test | only srcipt tests | |
-| ---- | ----------- | ------- |
-| src | debian testing (use this first) | all source files and base libs |
-| ---- | ----------- | ------- |
+|  |  |  |
+| src | debian testing (use this first) | all source repositories and base packages |
+|  |  |  |
 | ati | ati driver | 1 reboot,  1 run |
 | nvidia | nvidia driver | 1 reboot,  2 runs |
-| nvidia2 | nvidia driver official | 2 reboots, 3 runs) |
-| ---- | ----------- | ------- |
+| nvidia2 | nvidia driver official | 2 reboots, 3 runs |
+|  |  |  |
 | wine | Wine | |
 | steam | Steam | |
 | lutris | Lutris | |
 | dxvk | vulkan-based compatibility layer for Direct3D | |
 | dnet | Microsoft .Net 4.6.1 (do not use) | a horrible try :) |
-| ---- | ----------- | ------- |
+|  |  |  |
 | anbox | Anbox, a Android Emulator (very alpha) | I think this project is dead |
 | atom | Atom IDE | |
 | cuda | CudaText editor | many options to modify look and feeling |
 | discord | Discord | Chat I need |
-| dream | Dreambox Edit | to handle the channel of my TV |
+| dream | Dreambox Edit | to handle the channels of my TV |
 | java | java 8+11 jdk | Minecraft need java 8 |
 | kvm | KVM, QEMU with Virt-Manager | better as VirtualBox |
 | moka | nice icon set | not testet yet |
