@@ -52,9 +52,9 @@ if [[ -z "$VALUE" ]]; then
   echo
   echo "-src     	debian testing (use this first)"
   echo
-  echo "-ati     	ati driver             (1 reboot,  1 run)"
-  echo "-nvidia  	nvidia driver          (1 reboot,  2 runs)"
-  echo "-nvidia2 	nvidia driver official (2 reboots, 3 runs)"
+  echo "-ati     	ati driver             (1 reboot, 1 run)"
+  echo "-nvidia  	nvidia driver          (1 reboot, 2 runs)"
+  echo "-nvidia2 	nvidia driver official (1 reboot, 2 runs)"
   echo
   echo "-wine    	Wine"
   echo "-steam   	Steam"
@@ -68,7 +68,7 @@ if [[ -z "$VALUE" ]]; then
   echo "-discord  	Discord"
   echo "-dream    	Dreambox Edit"
   echo "-java    	java 8+11 jdk"
-  echo "-kvm     	KVM, QEMU with Virt-Manager (better than VirtualBox)"
+  echo "-kvm     	KVM, QEMU with Virt-Manager (1 reboot)"
   echo "-moka    	nice icon set"
   echo "-mozilla   	Firefox + Thunderbird"
   echo "-multimc   	Minecraft MultiMC"
@@ -317,6 +317,10 @@ if [[ ! -z "$DO_NVIDIA" ]]; then
       apt remove '^nvidia.*'
       sh $NVIDIA_DRV
 
+      apt install mesa-vulkan-drivers mesa-vulkan-drivers:i386
+      apt install libvulkan1 libvulkan1:i386
+      apt install vulkan-utils
+
       sudo -u $SUDO_USER touch "nvidia-step2"
       systemctl set-default graphical.target
     else
@@ -336,14 +340,6 @@ if [[ ! -z "$DO_NVIDIA" ]]; then
     fi
     reboot_now
   fi
-
-  apt install libgl1-mesa-dri libgl1-mesa-dri:i386
-  apt install libgl1-mesa-glx libgl1-mesa-glx:i386
-  apt install mesa-vulkan-drivers mesa-vulkan-drivers:i386
-
-  apt install libvulkan1 libvulkan1:i386
-  apt install vulkan-utils
-  apt autoremove
 fi
 
 #####################################################################
@@ -548,15 +544,10 @@ if [[ ! -z "$DO_CUDA_TEXT" ]]; then
 	  "ui_toolbar_show": true,
 	}
 	EOT
-  cat <<- EOT | sudo -u $SUDO_USER tee "$CUDA_SETTING/lexer Bash script.json" > /dev/null
-	{
-	  "nonword_chars": "-+*=/\\()[]{}<>\"'.,:;~?!@#$%^&|`?",
-	}
-	EOT
 
   find /usr -name 'libpython3.*so*' 2>/dev/null
   echo
-  echo "at CudaText..<options>..<Settings - user> change entry 'pylib__linux' and try other if not working"
+  echo "at <options>..<Settings - user> change entry 'pylib__linux' and try other if not working"
   echo "\"pylib__linux\" : \"$(basename $PHYLIB)\""
   echo
   echo "install with <Plugins><Addon Manager> 'Highlight Occurrences' if you want"
@@ -969,9 +960,4 @@ fi
 
 #####################################################################
 if [[ ! -z "$DO_TEST" ]]; then
-  if grep -E -q "path_add\(\)" .bashrc ; then
-    echo "true"
-  else
-    echo "false"
-  fi
 fi

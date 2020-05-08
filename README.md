@@ -7,14 +7,15 @@ It contains some steps I need to initialize a new system and all packages I will
 
 After a new installaion you need to run the script without sudo. This option adds the user to the sudoer group. You need to logout to apply these changes!
 
-```shell
-./install.sh -su
+```bash
+  chmod +x ./install.sh
+  ./install.sh -su
 ```
 
 Now you can run the script for all other installation steps with sudo rights.
 
-```shell
-sudo ./install.sh -FLAG
+```bash
+  sudo ./install.sh -FLAG    # also without -
 ```
 
 ## install options
@@ -28,7 +29,7 @@ sudo ./install.sh -FLAG
 |  |  |  |
 | ati | ati driver | 1 reboot,  1 run |
 | nvidia | nvidia driver | 1 reboot,  2 runs |
-| nvidia2 | nvidia driver official | 2 reboots, 3 runs |
+| nvidia2 | nvidia driver official | 1 reboot, 2 runs |
 |  |  |  |
 | wine | Wine | |
 | steam | Steam | |
@@ -42,11 +43,11 @@ sudo ./install.sh -FLAG
 | discord | Discord | Chat I need |
 | dream | Dreambox Edit | to handle the channels of my TV |
 | java | java 8+11 jdk | Minecraft needs java 8 |
-| kvm | KVM, QEMU with Virt-Manager | better than VirtualBox |
+| kvm | KVM, QEMU with Virt-Manager | 1 reboot, better than VirtualBox |
 | moka | nice icon set | not tested yet |
 | mozilla | Firefox + Thunderbird | |
 | multimc | Minecraft MultiMC | Minecraft Launcher |
-| ohmyz | ohmyz shell extension | very very powerful |
+| ohmyz | ohmyz bash extension | very very powerful |
 | pwsafe | Password Safe | too many secrets |
 | samba | Samba | access to Windows |
 | screen | XScreensaver | |
@@ -58,7 +59,7 @@ sudo ./install.sh -FLAG
 
 Show the system info of the graphic card.
 
-```shell
+```bash
   lspci -nn | egrep -i "3d|display|vga"
 ```
 
@@ -66,7 +67,7 @@ Show the system info of the graphic card.
 
 No special handling. Add the i386 architecture and install all vulkan based driver and dependecies.
 
-```shell
+```bash
   dpkg --add-architecture i386
   apt install libgl1-mesa-dri libgl1-mesa-dri:i386
   apt install libgl1-mesa-glx libgl1-mesa-glx:i386
@@ -81,14 +82,14 @@ No special handling. Add the i386 architecture and install all vulkan based driv
 
 You can check first the assembled NVIDIA grafic card. This program tell you the recommended steps.
 
-```shell
+```bash
   install_lib nvidia-detect
   nvidia-detect
 ```
 
 No special handling. Add the i386 architecture and install all vulkan based driver and dependecies.
 
-```shell
+```bash
   dpkg --add-architecture i386
   apt install nvidia-driver
   apt install libgl1-mesa-dri libgl1-mesa-dri:i386
@@ -104,7 +105,7 @@ No special handling. Add the i386 architecture and install all vulkan based driv
 Add the i386 architecture.
 You can check first the assembled NVIDIA grafic card. This program tell you the recommended steps.
 
-```shell
+```bash
   dpkg --add-architecture i386
   install_lib nvidia-detect
   nvidia-detect
@@ -114,7 +115,7 @@ You can check first the assembled NVIDIA grafic card. This program tell you the 
 
 1. First you need to install Dynamic Kernel Module Support. This was part of the 'src' Flag. I got better result with this tool.
 
-```shell
+```bash
   apt install linux-headers-$(uname -r | sed 's/[^-]*-[^-]*-//')
   apt install build-essential
   apt install dkms
@@ -122,53 +123,50 @@ You can check first the assembled NVIDIA grafic card. This program tell you the 
 
 2. The NVIDIA based graphic card test. (better is better)
 
-```shell
+```bash
   install_lib nvidia-detect
   nvidia-detect
 ```
 
-3. Blacklist the community driver nouveau and create a new image.
+3. Blacklist the community driver nouveau, create a new image and add gl libraries. Set the console mode for the next start and reboot.
 
-```shell
+```bash
+  # first run of 'sudo install.sh nvidia2'
+
   cat <<- EOT > /etc/modprobe.d/blacklist-nvidia-nouveau.conf
     blacklist nouveau
     options nouveau modeset=0
     EOT
 
   update-initramfs -u
-```
 
-4. Set the console mode for the next start and reboot.
+  apt install libgl1-mesa-dri libgl1-mesa-dri:i386
+  apt install libgl1-mesa-glx libgl1-mesa-glx:i386
 
-```shell
   systemctl set-default multi-user.target
   systemctl reboot
 ```
 
-5. Delete all old nvidia dependencies and install the proprietary driver.
+4. Delete all old nvidia dependencies and install the proprietary driver.
 As part of the nvidia installation routine you should answer all of the question with 'yes' and use all recommended upgrades.
 
-```shell
+```bash
+  # second run of 'sudo install.sh nvidia2'
+
   apt remove '^nvidia.*'
   sh $NVIDIA_DRV         # current NVIDIA-Linux-x86_64-440.82.run
+
+  apt install mesa-vulkan-drivers mesa-vulkan-drivers:i386
+  apt install libvulkan1 libvulkan1:i386
+  apt install vulkan-utils
 
   systemctl set-default graphical.target
   systemctl reboot
 ```
 
-6. Install all vulkan driver and dependencies.
-
-```shell
-  apt install libgl1-mesa-dri libgl1-mesa-dri:i386
-  apt install libgl1-mesa-glx libgl1-mesa-glx:i386
-  apt install mesa-vulkan-drivers mesa-vulkan-drivers:i386
-  apt install libvulkan1 libvulkan1:i386
-  apt install vulkan-utils
-```
-
-7. have fun
+5. have fun
 
 **special tip**
 
-When you get a problem on starting wine do following procedure.
-Delete my marker files nvidia-step1 and nvidia-step2. Repeat all these steps again and the problem with wine will bo gone.
+When you get a problem on starting steam do following procedure.
+Delete my marker files nvidia-step1 and nvidia-step2. Repeat all these steps again and the problem with steam will bo gone.
