@@ -5,55 +5,64 @@ It contains some steps I need to initialize a new system and all packages I will
 
 ## run options
 
-After a new installaion you need to run the script without sudo. This option adds the user to the sudoer group. You need to logout to apply these changes!
+After a new installaion you need to run the script without sudo.
+
+This option adds the user to the sudoer group. You need to logout to apply these changes!
 
 ```bash
   chmod +x ./install.sh
-  ./install.sh -su
+  ./install.sh su
 ```
 
 Now you can run the script for all other installation steps with sudo rights.
 
 ```bash
-  sudo ./install.sh -FLAG    # also without -
+  sudo ./install.sh FLAG    # also with -FLAG
 ```
 
 ## install options
+You can use a sign with the flags, but you don't need this.
 
 | FLAG | Description | Comment |
 | ---- | ----------- | ------- |
 | help | this help | |
 | test | only script tests | |
-|  |  |  |
+
+**System**
 | src | debian testing (use this first) | all source repositories and base packages |
-|  |  |  |
 | ati | ati driver | 1 reboot,  1 run |
 | nvidia | nvidia driver | 1 reboot,  2 runs |
 | nvidia2 | nvidia driver official | 1 reboot, 2 runs |
-|  |  |  |
+
+**Virtualization**
+| kvm | KVM, QEMU with Virt-Manager | 1 reboot, better than VirtualBox |
+| virtual | VirtualBox with SID library | removed from debian testing |
+| anbox | Anbox, a Android Emulator (very alpha) | I think this project is dead |
+
+**Gaming**
 | wine | Wine | |
 | steam | Steam | |
 | lutris | Lutris | |
 | dxvk | vulkan-based compatibility layer for Direct3D | |
 | dnet | Microsoft .Net 4.6.1 (do not use) | a horrible try :) |
-|  |  |  |
-| anbox | Anbox, a Android Emulator (very alpha) | I think this project is dead |
-| atom | Atom IDE | |
-| cuda | CudaText editor | many options to modify look and feel |
+| java | java 8+11 jdk | Minecraft needs java 8 |
+| multimc | Minecraft MultiMC | Minecraft Launcher |
+
+**Media**
 | discord | Discord | Chat I need |
 | dream | Dreambox Edit | to handle the channels of my TV |
-| java | java 8+11 jdk | Minecraft needs java 8 |
-| kvm | KVM, QEMU with Virt-Manager | 1 reboot, better than VirtualBox |
-| moka | nice icon set | not tested yet |
 | mozilla | Firefox + Thunderbird | |
-| multimc | Minecraft MultiMC | Minecraft Launcher |
+| spotify | Spotify | some music |
+| twitch | twitch gui + VideoLan + Chatty | I don't like advertising |
+
+**Diverse**
+| atom | Atom IDE | |
+| cuda | CudaText editor | many options to modify look and feel |
+| moka | nice icon set | not tested yet |
 | ohmyz | ohmyz bash extension | very very powerful |
 | pwsafe | Password Safe | too many secrets |
 | samba | Samba | access to Windows |
 | screen | XScreensaver | |
-| spotify | Spotify | some music |
-| twitch | twitch gui + VideoLan + Chatty | I don't like advertising |
-| virtual | VirtualBox with SID library | removed from debian testing |
 
 ## grafic cards
 
@@ -69,6 +78,7 @@ No special handling. Add the i386 architecture and install all vulkan based driv
 
 ```bash
   dpkg --add-architecture i386
+  apt install xserver-xorg-video-amdgpu
   apt install libgl1-mesa-dri libgl1-mesa-dri:i386
   apt install libgl1-mesa-glx libgl1-mesa-glx:i386
   apt install mesa-vulkan-drivers mesa-vulkan-drivers:i386

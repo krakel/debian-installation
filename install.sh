@@ -4,6 +4,50 @@
 # dmesg				# print or control the kernel ring buffer
 # journalctl		# query the systemd journal
 
+function help_msg() {
+  echo "Usage:"
+  echo "[sudo] install [flags]*"
+  echo
+  echo "Sudo:   	run without sudo for 'install su'"
+  echo "su      	only add user to sudo group"
+  echo "        	all other with sudo"
+  echo
+  echo "Flags:"
+  echo "help    	this help"
+  echo "test    	only script tests"
+  echo
+  echo "src     	debian testing (use this first)"
+  echo "ati     	ati driver             (1 reboot, 1 run)"
+  echo "nvidia  	nvidia driver          (1 reboot, 2 runs)"
+  echo "nvidia2 	nvidia driver official (1 reboot, 2 runs)"
+  echo
+  echo "kvm     	KVM, QEMU with Virt-Manager (1 reboot)"
+  echo "virtual 	VirtualBox with SID library (removed from debian testing)"
+  echo "anbox   	Anbox, a Android Emulator (very alpha)"
+  echo
+  echo "wine    	Wine"
+  echo "steam   	Steam"
+  echo "lutris  	Lutris"
+  echo "dxvk    	vulkan-based compatibility layer for Direct3D"
+  echo "dnet    	Microsoft .Net 4.6.1 (do not use)"
+  echo "java    	java 8+11 jdk"
+  echo "multimc 	Minecraft MultiMC"
+  echo
+  echo "discord 	Discord"
+  echo "dream   	Dreambox Edit"
+  echo "mozilla 	Firefox + Thunderbird"
+  echo "spotify 	Spotify, some music"
+  echo "twitch  	twitch gui + VideoLan + Chatty"
+  echo
+  echo "atom    	Atom IDE"
+  echo "cuda    	CudaText editor"
+  echo "moka    	nice icon set"
+  echo "ohmyz   	ohmyz shell extension"
+  echo "pwsafe  	Password Safe"
+  echo "samba   	Samba, access to Windows"
+  echo "screen  	XScreensaver"
+}
+
 declare -A SELECT=(
   [anbox]=DO_ANBOX
   [ati]=DO_ATI
@@ -35,54 +79,20 @@ declare -A SELECT=(
   [wine]=DO_WINE
 )
 
-KEY=${1#-}
-VALUE=${SELECT[$KEY]}
 
-if [[ -z "$VALUE" ]]; then
-  echo "Usage:"
-  echo "[sudo] install [flags]"
-  echo
-  echo "Sudo:    	run without sudo for install -su"
-  echo "-su      	only add user to sudo group"
-  echo "         	all other with sudo"
-  echo
-  echo "Flags:"
-  echo "-help    	this help"
-  echo "-test    	only script tests"
-  echo
-  echo "-src     	debian testing (use this first)"
-  echo
-  echo "-ati     	ati driver             (1 reboot, 1 run)"
-  echo "-nvidia  	nvidia driver          (1 reboot, 2 runs)"
-  echo "-nvidia2 	nvidia driver official (1 reboot, 2 runs)"
-  echo
-  echo "-wine    	Wine"
-  echo "-steam   	Steam"
-  echo "-lutris  	Lutris"
-  echo "-dxvk    	vulkan-based compatibility layer for Direct3D"
-  echo "-dnet    	Microsoft .Net 4.6.1 (do not use)"
-  echo
-  echo "-anbox   	Anbox, a Android Emulator (very alpha)"
-  echo "-atom    	Atom IDE"
-  echo "-cuda    	CudaText editor"
-  echo "-discord  	Discord"
-  echo "-dream    	Dreambox Edit"
-  echo "-java    	java 8+11 jdk"
-  echo "-kvm     	KVM, QEMU with Virt-Manager (1 reboot)"
-  echo "-moka    	nice icon set"
-  echo "-mozilla   	Firefox + Thunderbird"
-  echo "-multimc   	Minecraft MultiMC"
-  echo "-ohmyz   	ohmyz shell extension"
-  echo "-pwsafe   	Password Safe"
-  echo "-samba   	Samba - access to Windows"
-  echo "-screen     XScreensaver"
-  echo "-spotify   	Spotify - some music"
-  echo "-twitch    	twitch gui + VideoLan + Chatty"
-  echo "-virtual 	VirtualBox with SID library (removed from debian testing)"
-  exit
-fi
+while [[ $# -gt 0 ]]; do
+  KEY=${1#-}
+  VALUE=${SELECT[$KEY]}
 
-eval "$VALUE"=true		# eval is EVIL :)
+  if [[ -z "$VALUE" ]]; then
+    help_msg
+    exit
+  fi
+
+  eval "$VALUE"=true		# eval is EVIL :)
+  shift             		# past argument
+done
+
 
 SOURCES_DIR=/etc/apt/sources.list.d
 SUDO_USER=$(logname)
@@ -90,11 +100,33 @@ HOME_USER=/home/$SUDO_USER
 cd $HOME_USER
 
 #####################################################################
+function reboot_now() {
+  echo
+  echo -n "You NEED to reboot now (Y/n)!"
+  read ANSWER
+  if [[ "$ANSWER" == "${ANSWER#[Nn]}" ]]; then
+    systemctl reboot
+  else
+    exit 1
+  fi
+}
+
+function logout_now() {
+  echo
+  echo -n "You need to logout now (Y/n)!"
+  read ANSWER
+  if [[ "$ANSWER" == "${ANSWER#[Nn]}" ]]; then
+    logout
+  else
+    exit 1
+  fi
+}
+
 if [[ ! -z "$ONLY_SUDOER" ]]; then
   echo "enter your root password to add $SUDO_USER to group sudo"
   su - root -c bash -c "/sbin/usermod -aG sudo $SUDO_USER"    # add to group sudo
   echo
-  echo "You need to logout!"
+  logout_now
   exit
 fi
 
@@ -249,16 +281,6 @@ function check_card() {
   fi
 }
 
-function reboot_now() {
-  echo -n "Do you want to reboot now (Y/n)?"
-  read ANSWER
-  if [[ "$ANSWER" == "${ANSWER#[Nn]}" ]]; then
-    systemctl reboot
-  else
-    exit 1
-  fi
-}
-
 function download_driver() {
   SEARCH_OBJ="Downloads/$3"
   SEARCH_DRV=$(ls -t $SEARCH_OBJ 2>/dev/null | head -1)
@@ -300,7 +322,7 @@ if [[ ! -z "$DO_NVIDIA" ]]; then
   read -p "Press [Enter] key to continue..."
 
   if [[ -f "nvidia-step2" ]]; then
-    echo "you finished the installation of NVIDIA driver"
+    echo "You finished the installation of NVIDIA driver!"
   elif [[ -z "$DO_NVIDIA_OFFICAL" ]]; then
     apt install nvidia-driver
     apt autoremove
@@ -348,17 +370,16 @@ if [[ ! -z "$DO_ATI" ]]; then
   check_card "ATI"
 
   if [[ -f "ati-done" ]]; then
-    echo "you already installed ATI driver, continue..."
+    echo "You already installed the ATI driver!"
   else
     echo '######### install ATI driver'
     dpkg --add-architecture i386
+    apt install xserver-xorg-video-amdgpu
+    # apt install libgl1-fglrx-glx-i386
+
     apt install libgl1-mesa-dri libgl1-mesa-dri:i386
     apt install libgl1-mesa-glx libgl1-mesa-glx:i386
     apt install mesa-vulkan-drivers mesa-vulkan-drivers:i386
-
-    # apt install xserver-xorg-video-ati
-    # apt install libgl1-fglrx-glx-i386
-
     apt install libvulkan1 libvulkan1:i386
     apt install vulkan-utils
     apt autoremove
@@ -368,212 +389,15 @@ if [[ ! -z "$DO_ATI" ]]; then
 fi
 
 #####################################################################
-######### Wine
-######### WineHQ
-if [[ ! -z "$DO_WINE" ]]; then
-  echo '######### install Wine'
-  apt install gnupg2 software-properties-common
-
-  # not at latest debian testing
-  # repositories and images created with the Open Build Service
-  # OBS_URL="https://download.opensuse.org/repositories/Emulators:/Wine:/Debian/Debian_Testing_standard"
-  # wget -nv https://$OBS_URL/Release.key -O - | apt-key add -
-  # echo "deb http://$OBS_URL ./" | tee $SOURCES_DIR/wine-obs.list > /dev/null
-  # apt update
-
-  # LIB_SDL=libsdl2-2.0-0_2.0.10+dfsg1-1_amd64.deb
-  # sudo -u $SUDO_USER wget -P Downloads -nv http://ftp.us.debian.org/debian/pool/main/libs/libsdl2/$LIB_SDL
-  # dpkg -i Downloads/$LIB_SDL
-  # apt install libsdl2-2.0-0
-
-  # LIB_FAUDIO=libfaudio0_20.01-0~bullseye_amd64.deb
-  # sudo -u $SUDO_USER wget -P Downloads -nv https://$OBS_URL/amd64/$LIB_FAUDIO
-  # dpkg -i Downloads/$LIB_FAUDIO
-  # apt install libfaudio0
-
-  # winehq-stable:    Stable builds provide the latest stable version
-  # winehq-staging:   Staging builds contain many experimental patches intended to test some features or fix compatibility issues.
-  # winehq-devel:     Developer builds are in-development, cutting edge versions.
-
-  WINE_BUILDS="https://dl.winehq.org/wine-builds"
-  wget -nv  $WINE_BUILDS/winehq.key -O - | apt-key add -
-  echo "deb $WINE_BUILDS/debian/ bullseye main" | tee $SOURCES_DIR/wine.list > /dev/null
-  # echo "deb $WINE_BUILDS/debian/ testing  main" | tee $SOURCES_DIR/wine.list > /dev/null  # <-- broken, not working
-  apt update
-
-  apt install --install-recommends winehq-staging
-  apt install --install-recommends wine-staging wine-staging-i386 wine-staging-amd64
-  # apt install wine
-
-  add_bin_to_path '.bashrc' '/opt/wine-staging/bin'
-  add_bin_to_path '.zshrc'  '/opt/wine-staging/bin'
-
-  sudo -u $SUDO_USER winecfg		# mono,gecko will be installed
-  read -p "Press [Enter] key to continue, wait for winecfg..."
-
-  apt install mono-complete
-  apt install winetricks
-  apt autoremove
-  wine --version
-fi
-
+# Virtualization
 #####################################################################
-######### Steam
-if [[ ! -z "$DO_STEAM" ]]; then
-  echo '######### install Steam'
-  STEAM_BUILDS="https://repo.steampowered.com/steam"
-#  apt-key add --keyserver keyserver.ubuntu.com --recv-keys F24AEA9FB05498B7
-  wget -nv  $STEAM_BUILDS/archive/precise/steam.gpg -O - | apt-key add -
-  cat <<- EOT > $SOURCES_DIR/steam.list
-	deb     [arch=amd64,i386] $STEAM_BUILDS precise steam
-	deb-src [arch=amd64,i386] $STEAM_BUILDS precise steam
-	EOT
-
-  apt update
-  apt install libgl1-mesa-dri libgl1-mesa-dri:i386
-  apt install libgl1-mesa-glx libgl1-mesa-glx:i386
-  apt install steam
-  # apt install  steam-launcher
-
-  usermod -aG video,audio $SUDO_USER
-  apt autoremove
-  echo
-  echo "run steam and enable 'Steam Play' and 'Proton'"
-fi
-
-#####################################################################
-######### Lutris
-if [[ ! -z "$DO_LUTRIS" ]]; then
-  echo '######### install Lutris'
-  LUTRIS_URL="https://download.opensuse.org/repositories/home:/strycore/Debian_Testing"
-  wget -nv $LUTRIS_URL/Release.key -O - | apt-key add -
-  echo "deb $LUTRIS_URL/ ./" | tee $SOURCES_DIR/lutris.list > /dev/null
-  apt update
-  apt install lutris
-  apt install gamemode
-
-  find /usr -iname "libgamemode*"
-  LUTRIS_PRE=$(find /usr -iname "libgamemode*" | grep auto | head -1)
-  echo
-  echo "add to Lutris preferences and try other if not working (I don't know if needed)"
-  echo "LD_PRELOAD    = $LUTRIS_PRE"
-  echo "mesa_glthread = true"
-fi
-
-#####################################################################
-######### dxvk is a Vulkan-based compatibility layer for Direct3D 11
-if [[ ! -z "$DO_DXVK" ]]; then
-  echo '######### install DXVK'
-  apt install dxvk/sid
-fi
-
-#####################################################################
-######### Microsoft .Net 4.6.1
-if [[ ! -z "$DO_DOT_NET" ]]; then
-  echo '######### install .Net'
-  apt install winetricks
-  env WINEPREFIX=winedotnet wineboot --init
-  env WINEPREFIX=winedotnet winetricks dotnet461 corefonts
-fi
-
-#####################################################################
-######### nice shell extension
-# https://ohmyz.sh
-if [[ ! -z "$DO_OHMYZ" ]]; then
-  echo '######### install OHMYZ shell extension'
-  apt install git
-  apt install zsh
-  apt install curl
-
-  sudo -u $SUDO_USER bash -c "$(curl -fsSL https://raw.github.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
-  sudo -u $SUDO_USER sed -i '0,/ZSH_THEME="[^"]*"/s//ZSH_THEME="robbyrussell"/' .zshrc		 # ZSH_THEME="robbyrussell"
-  sudo -u $SUDO_USER sort .bash_history | uniq | awk '{print ": :0:;"$0}' >> .zsh_history
-
-  insert_path_fkts '.zshrc'
-fi
-
-#####################################################################
-######### nice text editor
-# http://uvviewsoft.com/cudatext/
-if [[ ! -z "$DO_CUDA_TEXT" ]]; then
-  echo '######### install CudaText editor'
-
-  CUDA_URL=https://www.fosshub.com/CudaText.html
-  CUDA_DEF='cudatext_1.98.0.0-1_gtk2_amd64.deb'
-  CUDA_SRC='cudatext_*_gtk2_amd64.deb'
-  CUDA_DEB=$(download_driver $CUDA_URL '' $CUDA_SRC)
-
-  echo "execute 'sudo dpkg -i $CUDA_DEB'"
-  dpkg -i $CUDA_DEB
-
-  DESKTOP_CUDA="Desktop/cudatext.desktop"
-  cat <<- EOT | sudo -u $SUDO_USER tee $DESKTOP_CUDA > /dev/null
-	[Desktop Entry]
-	Version=1.0
-	Name=Cuda Text
-	Comment=a cross-platform text editor, written in Lazarus.
-	Exec=cudatext
-	Icon=cudatext-512.png
-	Terminal=false
-	Type=Application
-	Categories=Utility;Application;Editor;
-	EOT
-  chmod +x $DESKTOP_CUDA
-
-  PHYLIB=$(find /usr -name 'libpython3.*so*' 2>/dev/null | head -1)
-
-  CUDA_SETTING=".config/cudatext/settings"
-  sudo -u $SUDO_USER mkdir -p "$CUDA_SETTING"
-
-  cat <<- EOT | sudo -u $SUDO_USER tee "$CUDA_SETTING/user.json" > /dev/null
-	{
-	  "auto_close_brackets": "([{\"'",
-	  "font_name__linux": "Monospace",
-	  "font_size__linux": 10,
-	  "indent_size": 2,
-	  "numbers_show": false,
-	  "pylib__linux": "$(basename $PHYLIB)",
-	  "saving_force_final_eol": true,
-	  "saving_trim_spaces": true,
-	  "tab_size": 4,
-	  "ui_one_instance": true,
-	  "ui_reopen_session": false,
-	  "ui_sidebar_show": false,
-	  "ui_theme": "ebony",
-	  "ui_theme_syntax": "ebony",
-	  "ui_toolbar_show": true,
-	}
-	EOT
-
-  find /usr -name 'libpython3.*so*' 2>/dev/null
-  echo
-  echo "at <options>..<Settings - user> change entry 'pylib__linux' and try other if not working"
-  echo "\"pylib__linux\" : \"$(basename $PHYLIB)\""
-  echo
-  echo "install with <Plugins><Addon Manager> 'Highlight Occurrences' if you want"
-fi
-
-#####################################################################
-######### nice icon sets
-# https://snwh.org/moka
-if [[ ! -z "$DO_MOKA" ]]; then
-  echo '######### install Moka'
-  LAUNCHMAD_LIBS=ttps://launchpadlibrarian.net
-
-  sudo -u $SUDO_USER wget -P Downloads -nv $LAUNCHMAD_LIBS/425937281/moka-icon-theme_5.4.523-201905300105~daily~ubuntu18.04.1_all.deb -O moka-icon-theme_5.4.523.deb
-  sudo -u $SUDO_USER wget -P Downloads -nv $LAUNCHMAD_LIBS/375793783/faba-icon-theme_4.3.317-201806241721~daily~ubuntu18.04.1_all.deb -O faba-icon-theme_4.3.317.deb
-# sudo -u $SUDO_USER wget -P Downloads -nv $LAUNCHMAD_LIBS/373757993/faba-mono-icons_4.4.102-201604301531~daily~ubuntu18.04.1_all.deb -O faba-mono-icons_4.4.102.deb
-
-  dpkg -i Downloads/moka-icon-theme_5.4.523.deb
-  dpkg -i Downloads/faba-icon-theme_4.3.317.deb
-fi
 
 #####################################################################
 ######### KVM - QEMU with Virt-Manager
 if [[ ! -z "$DO_KVM" ]]; then
   echo '######### install KVM'
   grep -o 'vmx\|svm' /proc/cpuinfo
-  read -p "Press [Enter] key to continue..."
+  read -p "You need some processors with svm support, press [Enter] key to continue..."
 
   apt install qemu-kvm
   apt install libvirt-clients libvirt-daemon libvirt-daemon-system
@@ -712,39 +536,115 @@ if [[ ! -z "$DO_ANBOX" ]]; then
 fi
 
 #####################################################################
-######### twitch gui + VideoLan + Chatty
-# https://www.videolan.org
-# https://github.com/streamlink/streamlink-twitch-gui
-# https://www.hiroom2.com/2018/05/27/ubuntu-1804-twitch-en/
-if [[ ! -z "$DO_TWITCH_GUI" ]]; then
-  echo '######### install VideoLan'
-  apt install vlc
+# Gaming
+#####################################################################
 
-  echo '######### install Streamlink'
-  apt install streamlink
+#####################################################################
+######### Wine
+######### WineHQ
+if [[ ! -z "$DO_WINE" ]]; then
+  echo '######### install Wine'
+  apt install gnupg2 software-properties-common
 
-  echo '######### install twitch gui'
-  TWITCH_URL=https://github.com/streamlink/streamlink-twitch-gui/releases
-  TWITCH_REL='v1.9.1'
-  TWITCH_DEF="streamlink-twitch-gui-${TWITCH_REL}-linux64.tar.gz"
-  TWITCH_SRC='streamlink-twitch-gui-*-linux64.tar.gz'
-  TWITCH_DRV=$(download_driver $TWITCH_URL $TWITCH_URL/download/$TWITCH_REL/$TWITCH_DEF $TWITCH_SRC)
+  # not at latest debian testing
+  # repositories and images created with the Open Build Service
+  # OBS_URL="https://download.opensuse.org/repositories/Emulators:/Wine:/Debian/Debian_Testing_standard"
+  # wget -nv https://$OBS_URL/Release.key -O - | apt-key add -
+  # echo "deb http://$OBS_URL ./" | tee $SOURCES_DIR/wine-obs.list > /dev/null
+  # apt update
 
-  tar -xzvf $TWITCH_DRV -C /opt
-  apt install xdg-utils libgconf-2-4
-  /opt/streamlink-twitch-gui/add-menuitem.sh
-  ln -s /opt/streamlink-twitch-gui/start.sh /usr/bin/streamlink-twitch-gui
+  # LIB_SDL=libsdl2-2.0-0_2.0.10+dfsg1-1_amd64.deb
+  # sudo -u $SUDO_USER wget -P Downloads -nv http://ftp.us.debian.org/debian/pool/main/libs/libsdl2/$LIB_SDL
+  # dpkg -i Downloads/$LIB_SDL
+  # apt install libsdl2-2.0-0
 
-  echo '######### install Chatty'
-  apt install default-jre
+  # LIB_FAUDIO=libfaudio0_20.01-0~bullseye_amd64.deb
+  # sudo -u $SUDO_USER wget -P Downloads -nv https://$OBS_URL/amd64/$LIB_FAUDIO
+  # dpkg -i Downloads/$LIB_FAUDIO
+  # apt install libfaudio0
 
-  CHATTY_URL=https://github.com/chatty/chatty/releases
-  CHATTY_REL='0.11'
-  CHATTY_DEF="Chatty_${CHATTY_REL}.zip"
-  CHATTY_SRC='Chatty_*.zip'
-  CHATTY_DRV=$(download_driver $CHATTY_URL $CHATTY_URL/download/v$CHATTY_REL/$CHATTY_DEF $CHATTY_SRC)
+  # winehq-stable:    Stable builds provide the latest stable version
+  # winehq-staging:   Staging builds contain many experimental patches intended to test some features or fix compatibility issues.
+  # winehq-devel:     Developer builds are in-development, cutting edge versions.
 
-  unzip $CHATTY_DRV -d /opt/chatty
+  WINE_BUILDS="https://dl.winehq.org/wine-builds"
+  wget -nv  $WINE_BUILDS/winehq.key -O - | apt-key add -
+  echo "deb $WINE_BUILDS/debian/ bullseye main" | tee $SOURCES_DIR/wine.list > /dev/null
+  # echo "deb $WINE_BUILDS/debian/ testing  main" | tee $SOURCES_DIR/wine.list > /dev/null  # <-- broken, not working
+  apt update
+
+  apt install --install-recommends winehq-staging
+  apt install --install-recommends wine-staging wine-staging-i386 wine-staging-amd64
+  # apt install wine
+
+  add_bin_to_path '.bashrc' '/opt/wine-staging/bin'
+  add_bin_to_path '.zshrc'  '/opt/wine-staging/bin'
+
+  sudo -u $SUDO_USER winecfg		# mono,gecko will be installed
+
+  apt install mono-complete
+  apt install winetricks
+  apt autoremove
+  wine --version
+fi
+
+#####################################################################
+######### Steam
+if [[ ! -z "$DO_STEAM" ]]; then
+  echo '######### install Steam'
+  STEAM_BUILDS="https://repo.steampowered.com/steam"
+#  apt-key add --keyserver keyserver.ubuntu.com --recv-keys F24AEA9FB05498B7
+  wget -nv  $STEAM_BUILDS/archive/precise/steam.gpg -O - | apt-key add -
+  cat <<- EOT > $SOURCES_DIR/steam.list
+	deb     [arch=amd64,i386] $STEAM_BUILDS precise steam
+	deb-src [arch=amd64,i386] $STEAM_BUILDS precise steam
+	EOT
+
+  apt update
+#  apt install libgl1-mesa-dri libgl1-mesa-dri:i386
+#  apt install libgl1-mesa-glx libgl1-mesa-glx:i386
+  apt install steam
+  # apt install  steam-launcher
+
+  usermod -aG video,audio $SUDO_USER
+  apt autoremove
+  echo
+  echo "run steam and enable 'Steam Play' and 'Proton'"
+fi
+
+#####################################################################
+######### Lutris
+if [[ ! -z "$DO_LUTRIS" ]]; then
+  echo '######### install Lutris'
+  LUTRIS_URL="https://download.opensuse.org/repositories/home:/strycore/Debian_Testing"
+  wget -nv $LUTRIS_URL/Release.key -O - | apt-key add -
+  echo "deb $LUTRIS_URL/ ./" | tee $SOURCES_DIR/lutris.list > /dev/null
+  apt update
+  apt install lutris
+  apt install gamemode
+
+  find /usr -iname "libgamemode*"
+  LUTRIS_PRE=$(find /usr -iname "libgamemode*" | grep auto | head -1)
+  echo
+  echo "add to Lutris preferences and try other if not working (I don't know if needed)"
+  echo "LD_PRELOAD    = $LUTRIS_PRE"
+  echo "mesa_glthread = true"
+fi
+
+#####################################################################
+######### dxvk is a Vulkan-based compatibility layer for Direct3D 11
+if [[ ! -z "$DO_DXVK" ]]; then
+  echo '######### install DXVK'
+  apt install dxvk/sid
+fi
+
+#####################################################################
+######### Microsoft .Net 4.6.1
+if [[ ! -z "$DO_DOT_NET" ]]; then
+  echo '######### install .Net'
+  apt install winetricks
+  env WINEPREFIX=winedotnet wineboot --init
+  env WINEPREFIX=winedotnet winetricks dotnet461 corefonts
 fi
 
 #####################################################################
@@ -766,6 +666,65 @@ if [[ ! -z "$DO_JAVA" ]]; then
   apt install adoptopenjdk-8-hotspot
 #  apt install adoptopenjdk-8-hotspot-jre
 #  apt install adoptopenjdk-8-openj9-jre
+fi
+
+#####################################################################
+######### MultiMC
+# https://multimc.org
+if [[ ! -z "$DO_MULTI_MC" ]]; then
+  echo '######### install Minecraft MultiMC'
+
+  apt install qt5-default
+
+  MULTIMC_URL=https://multimc.org
+  MULTIMC_REL='1.4-1'
+  MULTIMC_DEF="multimc_${MULTIMC_REL}.deb"
+  MULTIMC_SRC='multimc_*.deb'
+  MULTIMC_DRV=$(download_driver $MULTIMC_URL $MULTIMC_URL/download/$MULTIMC_DEF $MULTIMC_SRC)
+
+  dpkg -i $MULTIMC_DRV
+fi
+
+#####################################################################
+# Media
+#####################################################################
+
+#####################################################################
+######### Discord
+# https://linuxconfig.org/how-to-install-discord-on-linux
+if [[ ! -z "$DO_DISCORD" ]]; then
+  echo '######### install Discord'
+
+  DISCORD_URL=https://discordapp.com/api/download?platform=linux&format=deb
+  DISCORD_SRC='discord*.deb'
+  DISCORD_DRV=$(download_driver '' $DISCORD_URL $DISCORD_SRC)
+
+  dpkg -i $DISCORD_DRV
+fi
+
+#####################################################################
+######### Dreambox Edit
+# https://blog.videgro.net/2013/10/running-dreamboxedit-at-linux/
+if [[ ! -z "$DO_DREAMBOX_EDIT" ]]; then
+  echo '######### install Dreambox Edit'
+
+  DREAMBOX_URL=https://dreambox.de/board/index.php?board/47-sonstige-pc-software/
+  DREAMBOX_REL='7.2.1.0'
+  DREAMBOX_DEF="dreamboxEDIT_without_setup_${DREAMBOX_REL}.zip"
+  DREAMBOX_SRC='dreamboxEDIT_without_setup_*.zip'
+  DREAMBOX_DRV=$(download_driver $DREAMBOX_URL '' $DREAMBOX_SRC)
+
+  DREAMBOX_DIR=/opt/dreamboxedit
+  unzip $DREAMBOX_DRV -d $DREAMBOX_DIR
+#  ln -s /opt/dreamboxedit_5_3_0_0/ $DREAMBOX_DIR
+
+  groupadd dreamboxedit
+  usermod -aG dreamboxedit $SUDO_USER
+  chown -R root:dreamboxedit $DREAMBOX_DIR
+
+  echo
+  echo "cd /opt/dreamboxedit"
+  echo "wine dreamboxEDIT.exe"
 fi
 
 #####################################################################
@@ -805,9 +764,181 @@ if [[ ! -z "$DO_MOZILLA" ]]; then
 
   copy_profile 'Download/firefox.zip'     '.mozilla/firefox/profiles.ini'
   copy_profile 'Download/thunderbird.zip' '.mozilla/thunderbird/profiles.ini'
+fi
 
-#  sudo -u $SUDO_USER bash -c "DISPLAY=:0.0 firefox"
-#  read -p "Press [Enter] key to continue if you created a profile"
+#####################################################################
+######### Spotify
+# https://wiki.debian.org/spotify
+# https://www.spotify.com/de/download/linux/
+if [[ ! -z "$DO_SPOTIFY" ]]; then
+  echo '######### install Spotify'
+
+#  apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 4773BD5E130D1D45
+#  apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 931FF8E79F0876134EDDBDCCA87FF9DF48BF1C90
+  wget -nv https://download.spotify.com/debian/pubkey.gpg -O - | apt-key add -
+  echo "deb https://repository.spotify.com stable non-free" | tee $SOURCES_DIR/spotify.list > /dev/null
+  apt update
+
+  apt install spotify-client
+fi
+
+#####################################################################
+######### twitch gui + VideoLan + Chatty
+# https://www.videolan.org
+# https://github.com/streamlink/streamlink-twitch-gui
+# https://www.hiroom2.com/2018/05/27/ubuntu-1804-twitch-en/
+if [[ ! -z "$DO_TWITCH_GUI" ]]; then
+  echo '######### install VideoLan'
+  apt install vlc
+
+  echo '######### install Streamlink'
+  apt install streamlink
+
+  echo '######### install twitch gui'
+  TWITCH_URL=https://github.com/streamlink/streamlink-twitch-gui/releases
+  TWITCH_REL='v1.9.1'
+  TWITCH_DEF="streamlink-twitch-gui-${TWITCH_REL}-linux64.tar.gz"
+  TWITCH_SRC='streamlink-twitch-gui-*-linux64.tar.gz'
+  TWITCH_DRV=$(download_driver $TWITCH_URL $TWITCH_URL/download/$TWITCH_REL/$TWITCH_DEF $TWITCH_SRC)
+
+  tar -xzvf $TWITCH_DRV -C /opt
+  apt install xdg-utils libgconf-2-4
+  /opt/streamlink-twitch-gui/add-menuitem.sh
+  ln -s /opt/streamlink-twitch-gui/start.sh /usr/bin/streamlink-twitch-gui
+
+  echo '######### install Chatty'
+  apt install default-jre
+
+  CHATTY_URL=https://github.com/chatty/chatty/releases
+  CHATTY_REL='0.11'
+  CHATTY_DEF="Chatty_${CHATTY_REL}.zip"
+  CHATTY_SRC='Chatty_*.zip'
+  CHATTY_DRV=$(download_driver $CHATTY_URL $CHATTY_URL/download/v$CHATTY_REL/$CHATTY_DEF $CHATTY_SRC)
+
+  unzip $CHATTY_DRV -d /opt/chatty
+fi
+
+#####################################################################
+# Diverse
+#####################################################################
+
+#####################################################################
+######### Atom
+# https://linuxhint.com/install_atom_text_editor_debian_10/
+if [[ ! -z "$DO_ATOM" ]]; then
+  echo '######### install Atom IDE'
+
+  ATOM_URL=https://github.com/atom/atom/releases
+  ATOM_REL='v1.46.0'
+  ATOM_DEF="atom-amd64.deb"
+  ATOM_SRC='atom_*.deb'
+  ATOM_DRV=$(download_driver $ATOM_URL $ATOM_URL/tag/$ATOM_REL/$ATOM_DEF $ATOM_SRC)
+
+  dpkg -i $ATOM_DRV
+
+  atom --version
+fi
+
+#####################################################################
+######### nice text editor
+# http://uvviewsoft.com/cudatext/
+if [[ ! -z "$DO_CUDA_TEXT" ]]; then
+  echo '######### install CudaText editor'
+
+  CUDA_URL=https://www.fosshub.com/CudaText.html
+  CUDA_DEF='cudatext_1.98.0.0-1_gtk2_amd64.deb'
+  CUDA_SRC='cudatext_*_gtk2_amd64.deb'
+  CUDA_DEB=$(download_driver $CUDA_URL '' $CUDA_SRC)
+
+  echo "execute 'sudo dpkg -i $CUDA_DEB'"
+  dpkg -i $CUDA_DEB
+
+  DESKTOP_CUDA="Desktop/cudatext.desktop"
+  cat <<- EOT | sudo -u $SUDO_USER tee $DESKTOP_CUDA > /dev/null
+	[Desktop Entry]
+	Version=1.0
+	Name=Cuda Text
+	Comment=a cross-platform text editor, written in Lazarus.
+	Exec=cudatext
+	Icon=cudatext-512.png
+	Terminal=false
+	Type=Application
+	Categories=Utility;Application;Editor;
+	EOT
+  chmod +x $DESKTOP_CUDA
+
+  PHYLIB=$(find /usr -name 'libpython3.*so*' 2>/dev/null | head -1)
+
+  CUDA_SETTING=".config/cudatext/settings"
+  sudo -u $SUDO_USER mkdir -p "$CUDA_SETTING"
+
+  cat <<- EOT | sudo -u $SUDO_USER tee "$CUDA_SETTING/user.json" > /dev/null
+	{
+	  "auto_close_brackets": "([{\"'",
+	  "font_name__linux": "Monospace",
+	  "font_size__linux": 10,
+	  "indent_size": 2,
+	  "numbers_show": false,
+	  "pylib__linux": "$(basename $PHYLIB)",
+	  "saving_force_final_eol": true,
+	  "saving_trim_spaces": true,
+	  "tab_size": 4,
+	  "ui_one_instance": true,
+	  "ui_reopen_session": false,
+	  "ui_sidebar_show": false,
+	  "ui_theme": "ebony",
+	  "ui_theme_syntax": "ebony",
+	  "ui_toolbar_show": true,
+	}
+	EOT
+
+  find /usr -name 'libpython3.*so*' 2>/dev/null
+  echo
+  echo "at <options>..<Settings - user> change entry 'pylib__linux' and try other if not working"
+  echo "\"pylib__linux\" : \"$(basename $PHYLIB)\""
+  echo
+  echo "install with <Plugins><Addon Manager> 'Highlight Occurrences' if you want"
+fi
+
+#####################################################################
+######### nice icon sets
+# https://snwh.org/moka
+if [[ ! -z "$DO_MOKA" ]]; then
+  echo '######### install Moka'
+  LAUNCHMAD_LIBS=ttps://launchpadlibrarian.net
+
+  sudo -u $SUDO_USER wget -P Downloads -nv $LAUNCHMAD_LIBS/425937281/moka-icon-theme_5.4.523-201905300105~daily~ubuntu18.04.1_all.deb -O moka-icon-theme_5.4.523.deb
+  sudo -u $SUDO_USER wget -P Downloads -nv $LAUNCHMAD_LIBS/375793783/faba-icon-theme_4.3.317-201806241721~daily~ubuntu18.04.1_all.deb -O faba-icon-theme_4.3.317.deb
+# sudo -u $SUDO_USER wget -P Downloads -nv $LAUNCHMAD_LIBS/373757993/faba-mono-icons_4.4.102-201604301531~daily~ubuntu18.04.1_all.deb -O faba-mono-icons_4.4.102.deb
+
+  dpkg -i Downloads/moka-icon-theme_5.4.523.deb
+  dpkg -i Downloads/faba-icon-theme_4.3.317.deb
+fi
+
+#####################################################################
+######### nice shell extension
+# https://ohmyz.sh
+if [[ ! -z "$DO_OHMYZ" ]]; then
+  echo '######### install OHMYZ shell extension'
+  apt install git
+  apt install zsh
+  apt install curl
+
+  sudo -u $SUDO_USER bash -c "$(curl -fsSL https://raw.github.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
+  sudo -u $SUDO_USER sed -i '0,/ZSH_THEME="[^"]*"/s//ZSH_THEME="robbyrussell"/' .zshrc		 # ZSH_THEME="robbyrussell"
+  sudo -u $SUDO_USER sort .bash_history | uniq | awk '{print ": :0:;"$0}' >> .zsh_history
+
+  insert_path_fkts '.zshrc'
+  logout_now
+fi
+
+#####################################################################
+######### Password Safe
+# https://howtoinstall.co/en/debian/stretch/passwordsafe-common
+if [[ ! -z "$DO_PASSWORD_SAFE" ]]; then
+  echo '######### install Password Safe'
+
+  apt install passwordsafe
 fi
 
 #####################################################################
@@ -853,102 +984,6 @@ if [[ ! -z "$DO_SAMBA" ]]; then
 
   apt install smbclient
   smbclient -L localhost
-fi
-
-#####################################################################
-######### MultiMC
-# https://multimc.org
-if [[ ! -z "$DO_MULTI_MC" ]]; then
-  echo '######### install Minecraft MultiMC'
-
-  apt install qt5-default
-
-  MULTIMC_URL=https://multimc.org
-  MULTIMC_REL='1.4-1'
-  MULTIMC_DEF="multimc_${MULTIMC_REL}.deb"
-  MULTIMC_SRC='multimc_*.deb'
-  MULTIMC_DRV=$(download_driver $MULTIMC_URL $MULTIMC_URL/download/$MULTIMC_DEF $MULTIMC_SRC)
-
-  dpkg -i $MULTIMC_DRV
-fi
-
-#####################################################################
-######### Discord
-# https://linuxconfig.org/how-to-install-discord-on-linux
-if [[ ! -z "$DO_DISCORD" ]]; then
-  echo '######### install Discord'
-
-  DISCORD_URL=https://discordapp.com/api/download?platform=linux&format=deb
-  DISCORD_SRC='discord*.deb'
-  DISCORD_DRV=$(download_driver '' $DISCORD_URL $DISCORD_SRC)
-
-  dpkg -i $DISCORD_DRV
-fi
-
-#####################################################################
-######### Atom
-# https://linuxhint.com/install_atom_text_editor_debian_10/
-if [[ ! -z "$DO_ATOM" ]]; then
-  echo '######### install Atom IDE'
-
-  ATOM_URL=https://github.com/atom/atom/releases
-  ATOM_REL='v1.46.0'
-  ATOM_DEF="atom-amd64.deb"
-  ATOM_SRC='atom_*.deb'
-  ATOM_DRV=$(download_driver $ATOM_URL $ATOM_URL/tag/$ATOM_REL/$ATOM_DEF $ATOM_SRC)
-
-  dpkg -i $ATOM_DRV
-
-  atom --version
-fi
-
-#####################################################################
-######### Spotify
-# https://wiki.debian.org/spotify
-# https://www.spotify.com/de/download/linux/
-if [[ ! -z "$DO_SPOTIFY" ]]; then
-  echo '######### install Spotify'
-
-#  apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 4773BD5E130D1D45
-#  apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 931FF8E79F0876134EDDBDCCA87FF9DF48BF1C90
-  wget -nv https://download.spotify.com/debian/pubkey.gpg -O - | apt-key add -
-  echo "deb https://repository.spotify.com stable non-free" | tee $SOURCES_DIR/spotify.list > /dev/null
-
-  apt update
-  apt install spotify-client
-fi
-
-#####################################################################
-######### Password Safe
-# https://howtoinstall.co/en/debian/stretch/passwordsafe-common
-if [[ ! -z "$DO_PASSWORD_SAFE" ]]; then
-  echo '######### install Password Safe'
-
-  apt install passwordsafe
-fi
-
-#####################################################################
-######### Dreambox Edit
-# https://blog.videgro.net/2013/10/running-dreamboxedit-at-linux/
-if [[ ! -z "$DO_DREAMBOX_EDIT" ]]; then
-  echo '######### install Dreambox Edit'
-
-  DREAMBOX_URL=https://dreambox.de/board/index.php?board/47-sonstige-pc-software/
-  DREAMBOX_REL='7.2.1.0'
-  DREAMBOX_DEF="dreamboxEDIT_without_setup_${DREAMBOX_REL}.zip"
-  DREAMBOX_SRC='dreamboxEDIT_without_setup_*.zip'
-  DREAMBOX_DRV=$(download_driver $DREAMBOX_URL '' $DREAMBOX_SRC)
-
-  DREAMBOX_DIR=/opt/dreamboxedit
-  unzip $DREAMBOX_DRV -d $DREAMBOX_DIR
-#  ln -s /opt/dreamboxedit_5_3_0_0/ $DREAMBOX_DIR
-
-  groupadd dreamboxedit
-  usermod -aG dreamboxedit $SUDO_USER
-  chown -R root:dreamboxedit $DREAMBOX_DIR
-
-  echo "cd /opt/dreamboxedit"
-  echo "wine dreamboxEDIT.exe"
 fi
 
 #####################################################################
