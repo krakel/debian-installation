@@ -97,11 +97,8 @@ Add the i386 architecture and check first the assembled NVIDIA grafic card. This
   nvidia-detect
 ```
 
-#### open source
-No special handling. Add the i386 architecture and install all vulkan based driver and dependecies.
-
-#### closed source
-**Many special handling.**
+- Open Source: No special handling. Install all vulkan based driver and dependecies.
+- Closed Source: **Many special handling.**
 
 1. First you need to install Dynamic Kernel Module Support. This was part of the 'src' Flag. I got better result with this method.
 2. The NVIDIA based graphic card test. (better is better)
