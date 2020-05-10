@@ -17,8 +17,8 @@ function help_msg() {
   echo "test    	only script tests"
   echo
   echo "src     	debian testing (use this first)"
-  echo "amd     	amd/ati driver         (1 reboot, 1 run)"
-  echo "nvidia  	nvidia driver          (1 reboot, 2 runs)"
+  echo "amd     	amd/ati driver         (1 reboot)"
+  echo "nvidia  	nvidia driver          (1 reboot)"
   echo "nvidia2 	nvidia driver official (1 reboot, 2 runs)"
   echo
   echo "kvm     	KVM, QEMU with Virt-Manager (1 reboot)"

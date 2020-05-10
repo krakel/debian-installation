@@ -32,8 +32,8 @@ You can use a sign with the flags, but you don't need this.
 | FLAG | Description | Comment |
 | ---- | ----------- | ------- |
 | src | debian testing (use this first) | all source repositories and base packages |
-| amd | amd/ati driver | 1 reboot,  1 run |
-| nvidia | nvidia driver | 1 reboot,  2 runs |
+| amd | amd/ati driver | 1 reboot |
+| nvidia | nvidia driver | 1 reboot |
 | nvidia2 | nvidia driver official | 1 reboot, 2 runs |
 
 **Virtualization**
@@ -210,16 +210,16 @@ As part of the nvidia installation routine you should answer all of the question
 
 **special tip**
 
-When you get a problem on starting steam do following procedure.
-Delete my marker files nvidia-step1 and nvidia-step2. Repeat all these steps again and the problem with steam will bo gone.
+> When you get a problem on starting steam do following procedure.
+> Delete my marker files nvidia-step1 and nvidia-step2. Repeat all these steps again and the problem with steam will bo gone.
 
 ## Virtualization
 The best choise for virtualization is the KVM package. It's part of the kernel and get the best performance experience.
 
 ### KVM Installation
 You need first check if your processor and board support the virtualization extension.
-Enable Intel Virtualization Technology (also known as Intel VT) or AMD-V depending on the brand of the processor.
-The virtualization extensions may be labeled Virtualization Extensions, Vanderpool or various other names depending on the OEM and system BIOS.
+> Enable Intel Virtualization Technology (also known as Intel VT) or AMD-V depending on the brand of the processor.
+> The virtualization extensions may be labeled Virtualization Extensions, Vanderpool or various other names depending on the OEM and system BIOS.
 ```bash
   grep -o 'vmx\|svm' /proc/cpuinfo
 ```
