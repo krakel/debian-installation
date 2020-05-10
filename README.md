@@ -217,7 +217,9 @@ Delete my marker files nvidia-step1 and nvidia-step2. Repeat all these steps aga
 The best choise for virtualization is the KVM package. It's part of the kernel and get the best performance experience.
 
 ### KVM Installation
-You need first check if your processor and borad enabled the virtualization extension.
+You need first check if your processor and board support the virtualization extension.
+Enable Intel Virtualization Technology (also known as Intel VT) or AMD-V depending on the brand of the processor.
+The virtualization extensions may be labeled Virtualization Extensions, Vanderpool or various other names depending on the OEM and system BIOS.
 ```bash
   grep -o 'vmx\|svm' /proc/cpuinfo
 ```
@@ -230,7 +232,8 @@ Now you can install all libraries.
   apt install virtinst virt-viewer virt-manager
 ```
 
-Please read the description of the differnce between 'qemu:///system' and 'qemu:///session':
+Please read the description of the difference between 'qemu:///system' and 'qemu:///session'.
+
 [qemusystem-vs-qemusession](https://blog.wikichoon.com/2016/01/qemusystem-vs-qemusession.html)
 
 I add the LIBVIRT_DEFAULT_URI environment variable to preselect my preference.
@@ -244,7 +247,7 @@ Once above packages are installed successfully then libvirtd service will be sta
   systemctl status libvirtd
 ```
 
-Finally I add the user to libvirtd groups and create a common directory for all my iso's.
+Finally I added the user to libvirtd groups and create a common directory for all my iso's.
 ```bash
   adduser $SUDO_USER libvirt
   adduser $SUDO_USER libvirt-qemu
@@ -253,11 +256,13 @@ Finally I add the user to libvirtd groups and create a common directory for all 
   chown -R $SUDO_USER:$SUDO_USER /media/data
 ```
 
-Now you shoud reboot your system.
+Now you should reboot your system.
 
 ### Network Bridging
-The best choise for network connection from a virtual machine to the internet gets a network bridge. I follow the guide based in this video:
+The best choise for network connection from a virtual machine to the internet gets a network bridge. I follow the guide based in this video.
+
 [Network Bridging for Virtual Machine Manager](https://www.youtube.com/watch?v=rSxK_08LSZw)
+
 It was demonstrated on a Fedora distibution but works very well on Debian.
 
 ## Gaming

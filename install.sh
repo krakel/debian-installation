@@ -122,6 +122,16 @@ function logout_now() {
   fi
 }
 
+function continue_now() {
+  echo
+  echo "$1"
+  echo -n "You need to continue now (Y/n)!"
+  read ANSWER
+  if [[ "$ANSWER" == "${ANSWER#[Yy]}" ]]; then
+    exit 1
+  fi
+}
+
 if [[ ! -z "$ONLY_SUDOER" ]]; then
   echo "enter your root password to add $SUDO_USER to group sudo"
   su - root -c bash -c "/sbin/usermod -aG sudo $SUDO_USER"    # add to group sudo
@@ -400,7 +410,7 @@ fi
 if [[ ! -z "$DO_KVM" ]]; then
   echo '######### install KVM'
   grep -o 'vmx\|svm' /proc/cpuinfo
-  read -p "You need some processors with svm support, press [Enter] key to continue..."
+  continue_now "You need some processors with vmx or svm support"
 
   apt install qemu-kvm
   apt install libvirt-clients libvirt-daemon libvirt-daemon-system
