@@ -87,25 +87,20 @@ Show the system info of the graphic card.
   lspci -nn | egrep -i "3d|display|vga"
 ```
 
-### AMD open source
+### AMD Graphic Card
 No special handling. Add the i386 architecture and install all vulkan based driver and dependecies.
 
-### NVIDIA open source
-You can check first the assembled NVIDIA grafic card. This program tell you the recommended steps.
+### NVIDIA Graphic Card
+Add the i386 architecture and check first the assembled NVIDIA grafic card. This program tell you the recommended steps.
 ```bash
   install_lib nvidia-detect
   nvidia-detect
 ```
 
+#### open source
 No special handling. Add the i386 architecture and install all vulkan based driver and dependecies.
 
-### NVIDIA closed source
-First you add the i386 architecture. You can check first the assembled NVIDIA grafic card. This program tell you the recommended steps.
-```bash
-  install_lib nvidia-detect
-  nvidia-detect
-```
-
+#### closed source
 **Many special handling.**
 
 1. First you need to install Dynamic Kernel Module Support. This was part of the 'src' Flag. I got better result with this method.
