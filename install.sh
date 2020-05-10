@@ -17,7 +17,7 @@ function help_msg() {
   echo "test    	only script tests"
   echo
   echo "src     	debian testing (use this first)"
-  echo "ati     	ati driver             (1 reboot, 1 run)"
+  echo "amd     	amd/ati driver         (1 reboot, 1 run)"
   echo "nvidia  	nvidia driver          (1 reboot, 2 runs)"
   echo "nvidia2 	nvidia driver official (1 reboot, 2 runs)"
   echo
@@ -50,7 +50,7 @@ function help_msg() {
 
 declare -A SELECT=(
   [anbox]=DO_ANBOX
-  [ati]=DO_ATI
+  [amd]=DO_AMD
   [atom]=DO_ATOM
   [cuda]=DO_CUDA_TEXT
   [discord]=DO_DISCORD
@@ -305,28 +305,30 @@ if [[ ! -z "$DO_NVIDIA_OFFICAL" ]]; then
   DO_NVIDIA=true
 fi
 
-if [[ ! -z "$DO_ATI" ]] && [[ ! -z "$DO_NVIDIA" ]]; then
-  echo "install only one type of graphic driver (ATI or NVIDIA)"
+if [[ ! -z "$DO_AMD" ]] && [[ ! -z "$DO_NVIDIA" ]]; then
+  echo "install only one type of graphic driver (AMD or NVIDIA)"
   exit 1
 fi
 
 #####################################################################
 ######### NVIDIA driver 440.xx
 if [[ ! -z "$DO_NVIDIA" ]]; then
-  check_card "NVIDIA"
+  NVIDIA_STEP1="nvidia-step1"
+  NVIDIA_STEP2="nvidia-step2"
 
+  check_card "NVIDIA"
   echo "######### install NVIDIA driver for $OPSYSTEM"
   dpkg --add-architecture i386
   install_lib nvidia-detect
   nvidia-detect
   read -p "Press [Enter] key to continue..."
 
-  if [[ -f "nvidia-step2" ]]; then
+  if [[ -f "$NVIDIA_STEP2" ]]; then
     echo "You finished the installation of NVIDIA driver!"
   elif [[ -z "$DO_NVIDIA_OFFICAL" ]]; then
     apt install nvidia-driver
     apt autoremove
-    sudo -u $SUDO_USER touch "nvidia-step2"
+    sudo -u $SUDO_USER touch $NVIDIA_STEP2
     reboot_now
   else
     NVIDIA_URL=https://www.nvidia.com/en-us/drivers/unix/
@@ -334,7 +336,7 @@ if [[ ! -z "$DO_NVIDIA" ]]; then
     NVIDIA_DEF=http://us.download.nvidia.com/XFree86/Linux-x86_64/${NVIDIA_REL}/NVIDIA-Linux-x86_64-${NVIDIA_REL}.run
     NVIDIA_SRC='NVIDIA-Linux-x86_64-*.run'
     NVIDIA_DRV=$(download_driver $NVIDIA_URL $NVIDIA_DEF $NVIDIA_SRC)
-    if [[ -f "nvidia-step1" ]]; then
+    if [[ -f "$NVIDIA_STEP1" ]]; then
       # official nvidia.com package step 2
       apt remove '^nvidia.*'
       sh $NVIDIA_DRV
@@ -343,7 +345,7 @@ if [[ ! -z "$DO_NVIDIA" ]]; then
       apt install libvulkan1 libvulkan1:i386
       apt install vulkan-utils
 
-      sudo -u $SUDO_USER touch "nvidia-step2"
+      sudo -u $SUDO_USER touch $NVIDIA_STEP2
       systemctl set-default graphical.target
     else
       # official nvidia.com package step 1
@@ -357,7 +359,7 @@ if [[ ! -z "$DO_NVIDIA" ]]; then
       apt install libgl1-mesa-dri libgl1-mesa-dri:i386
       apt install libgl1-mesa-glx libgl1-mesa-glx:i386
 
-      sudo -u $SUDO_USER touch "nvidia-step1"
+      sudo -u $SUDO_USER touch $NVIDIA_STEP1
       systemctl set-default multi-user.target
     fi
     reboot_now
@@ -366,13 +368,14 @@ fi
 
 #####################################################################
 ######### AMD driver
-if [[ ! -z "$DO_ATI" ]]; then
-  check_card "ATI"
+if [[ ! -z "$DO_AMD" ]]; then
+  AMD_DONE="amd-done"
 
-  if [[ -f "ati-done" ]]; then
-    echo "You already installed the ATI driver!"
+  check_card "AMD"
+  if [[ -f "$AMD_DONE" ]]; then
+    echo "You already installed the AMD driver!"
   else
-    echo '######### install ATI driver'
+    echo '######### install AMD driver'
     dpkg --add-architecture i386
     apt install xserver-xorg-video-amdgpu
     # apt install libgl1-fglrx-glx-i386
@@ -383,7 +386,7 @@ if [[ ! -z "$DO_ATI" ]]; then
     apt install libvulkan1 libvulkan1:i386
     apt install vulkan-utils
     apt autoremove
-    sudo -u $SUDO_USER touch "ati-done"
+    sudo -u $SUDO_USER touch "$AMD_DONE"
     reboot_now
   fi
 fi

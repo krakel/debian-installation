@@ -29,17 +29,23 @@ You can use a sign with the flags, but you don't need this.
 | test | only script tests | |
 
 **System**
+| FLAG | Description | Comment |
+| ---- | ----------- | ------- |
 | src | debian testing (use this first) | all source repositories and base packages |
-| ati | ati driver | 1 reboot,  1 run |
+| amd | amd/ati driver | 1 reboot,  1 run |
 | nvidia | nvidia driver | 1 reboot,  2 runs |
 | nvidia2 | nvidia driver official | 1 reboot, 2 runs |
 
 **Virtualization**
+| FLAG | Description | Comment |
+| ---- | ----------- | ------- |
 | kvm | KVM, QEMU with Virt-Manager | 1 reboot, better than VirtualBox |
 | virtual | VirtualBox with SID library | removed from debian testing |
 | anbox | Anbox, a Android Emulator (very alpha) | I think this project is dead |
 
 **Gaming**
+| FLAG | Description | Comment |
+| ---- | ----------- | ------- |
 | wine | Wine | |
 | steam | Steam | |
 | lutris | Lutris | |
@@ -49,6 +55,8 @@ You can use a sign with the flags, but you don't need this.
 | multimc | Minecraft MultiMC | Minecraft Launcher |
 
 **Media**
+| FLAG | Description | Comment |
+| ---- | ----------- | ------- |
 | discord | Discord | Chat I need |
 | dream | Dreambox Edit | to handle the channels of my TV |
 | mozilla | Firefox + Thunderbird | |
@@ -56,6 +64,8 @@ You can use a sign with the flags, but you don't need this.
 | twitch | twitch gui + VideoLan + Chatty | I don't like advertising |
 
 **Diverse**
+| FLAG | Description | Comment |
+| ---- | ----------- | ------- |
 | atom | Atom IDE | |
 | cuda | CudaText editor | many options to modify look and feel |
 | moka | nice icon set | not tested yet |
@@ -64,18 +74,50 @@ You can use a sign with the flags, but you don't need this.
 | samba | Samba | access to Windows |
 | screen | XScreensaver | |
 
-## grafic cards
+## Source Repositories
+I replace the original source repositories. The original one will be saved as '/etc/apt/sources.orig'. I will use the testing branch for the newest feature.
+```
+  deb     http://deb.debian.org/debian               testing          main contrib non-free
+  deb-src http://deb.debian.org/debian               testing          main contrib non-free
 
+  deb     http://deb.debian.org/debian               testing-updates  main contrib non-free
+  deb-src http://deb.debian.org/debian               testing-updates  main contrib non-free
+
+  deb     http://security.debian.org/debian-security testing-security main contrib non-free
+  deb-src http://security.debian.org/debian-security testing-security main contrib non-free
+
+  deb     http://deb.debian.org/debian/              sid              main non-free contrib
+  deb-src http://deb.debian.org/debian/              sid              main non-free contrib
+```
+
+I added the sid repository! For this on we need a preferences file at '/etc/apt/preferences.d/debian-sid'. The use of sid package must be explicitly selected.
+```
+  Package: *
+  Pin: release n=testing
+  Pin-Priority: 900
+
+  Package: *
+  Pin: release n=sid
+  Pin-Priority: -10
+```
+
+The src installation close with some basic packages.
+```bash
+  apt install apt-transport-https			# enables the usage of https with deb's
+  apt install firmware-linux-nonfree
+  apt install linux-headers-$(uname -r | sed 's/[^-]*-[^-]*-//')
+  apt install build-essential				# all packages needed to compile package
+  apt install dkms							# Dynamic Kernel Module Support
+```
+
+## Grafic Cards
 Show the system info of the graphic card.
-
 ```bash
   lspci -nn | egrep -i "3d|display|vga"
 ```
 
-### ATI open source
-
+### AMD open source
 No special handling. Add the i386 architecture and install all vulkan based driver and dependecies.
-
 ```bash
   dpkg --add-architecture i386
   apt install xserver-xorg-video-amdgpu
@@ -89,16 +131,13 @@ No special handling. Add the i386 architecture and install all vulkan based driv
 ```
 
 ### NVIDIA open source
-
 You can check first the assembled NVIDIA grafic card. This program tell you the recommended steps.
-
 ```bash
   install_lib nvidia-detect
   nvidia-detect
 ```
 
 No special handling. Add the i386 architecture and install all vulkan based driver and dependecies.
-
 ```bash
   dpkg --add-architecture i386
   apt install nvidia-driver
@@ -111,10 +150,7 @@ No special handling. Add the i386 architecture and install all vulkan based driv
 ```
 
 ### NVIDIA closed source
-
-Add the i386 architecture.
-You can check first the assembled NVIDIA grafic card. This program tell you the recommended steps.
-
+First you add the i386 architecture. You can check first the assembled NVIDIA grafic card. This program tell you the recommended steps.
 ```bash
   dpkg --add-architecture i386
   install_lib nvidia-detect
@@ -124,7 +160,6 @@ You can check first the assembled NVIDIA grafic card. This program tell you the 
 **Many special handling.**
 
 1. First you need to install Dynamic Kernel Module Support. This was part of the 'src' Flag. I got better result with this tool.
-
 ```bash
   apt install linux-headers-$(uname -r | sed 's/[^-]*-[^-]*-//')
   apt install build-essential
@@ -132,14 +167,12 @@ You can check first the assembled NVIDIA grafic card. This program tell you the 
 ```
 
 2. The NVIDIA based graphic card test. (better is better)
-
 ```bash
   install_lib nvidia-detect
   nvidia-detect
 ```
 
 3. Blacklist the community driver nouveau, create a new image and add gl libraries. Set the console mode for the next start and reboot.
-
 ```bash
   # first run of 'sudo install.sh nvidia2'
 
@@ -159,7 +192,6 @@ You can check first the assembled NVIDIA grafic card. This program tell you the 
 
 4. Delete all old nvidia dependencies and install the proprietary driver.
 As part of the nvidia installation routine you should answer all of the question with 'yes' and use all recommended upgrades.
-
 ```bash
   # second run of 'sudo install.sh nvidia2'
 
@@ -180,3 +212,60 @@ As part of the nvidia installation routine you should answer all of the question
 
 When you get a problem on starting steam do following procedure.
 Delete my marker files nvidia-step1 and nvidia-step2. Repeat all these steps again and the problem with steam will bo gone.
+
+## Virtualization
+The best choise for virtualization is the KVM package. It's part of the kernel and get the best performance experience.
+
+### KVM Installation
+You need first check if your processor and borad enabled the virtualization extension.
+```bash
+  grep -o 'vmx\|svm' /proc/cpuinfo
+```
+
+Now you can install all libraries.
+```bash
+  apt install qemu-kvm
+  apt install libvirt-clients libvirt-daemon libvirt-daemon-system
+  apt install libguestfs-tools libosinfo-bin bridge-utils geinisoimage
+  apt install virtinst virt-viewer virt-manager
+```
+
+Please read the description of the differnce between 'qemu:///system' and 'qemu:///session':
+[qemusystem-vs-qemusession](https://blog.wikichoon.com/2016/01/qemusystem-vs-qemusession.html)
+
+I add the LIBVIRT_DEFAULT_URI environment variable to preselect my preference.
+```bash
+  add_export_env '.bashrc' 'LIBVIRT_DEFAULT_URI' 'qemu:///system'
+  add_export_env '.zshrc'  'LIBVIRT_DEFAULT_URI' 'qemu:///system'
+```
+
+Once above packages are installed successfully then libvirtd service will be started automatically, run the below systemctl command to verify the status.
+```bash
+  systemctl status libvirtd
+```
+
+Finally I add the user to libvirtd groups and create a common directory for all my iso's.
+```bash
+  adduser $SUDO_USER libvirt
+  adduser $SUDO_USER libvirt-qemu
+
+  mkdir /media/data/iso
+  chown -R $SUDO_USER:$SUDO_USER /media/data
+```
+
+Now you shoud reboot your system.
+
+### Network Bridging
+The best choise for network connection from a virtual machine to the internet gets a network bridge. I follow the guide based in this video:
+[Network Bridging for Virtual Machine Manager](https://www.youtube.com/watch?v=rSxK_08LSZw)
+It was demonstrated on a Fedora distibution but works very well on Debian.
+
+## Gaming
+
+### Wine
+
+### Steam
+
+### Lutris
+
+### DXVK
