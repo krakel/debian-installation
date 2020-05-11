@@ -1066,15 +1066,18 @@ if [[ ! -z "$DO_CIFS" ]]; then
   mkdir /mnt/Old_D
   mkdir /mnt/Old_E
 
-  WINDOWS_USER=$SUDO_USER
-  WINDOWS_DOMAIN='WORK'
-  WIN_CREDENTIALS='/etc/win-credentials'
+  WINDOWS_USER=$SUDO_USER       # change this to your windows user name
+  WINDOWS_DOMAIN='WORK.local'	# change this to your windows domain
+
   echo -n 'type your windows password for $SUDO_USER:'
   read -s WINDOWS_PW
+  echo
+
+  WIN_CREDENTIALS='/etc/win-credentials'
   cat <<- EOT | tee $WIN_CREDENTIALS > /dev/null
-	username = $WINDOWS_USER
-	password = $WINDOWS_PW
-	domain = $WINDOWS_DOMAIN
+	username=$WINDOWS_USER
+	password=$WINDOWS_PW
+	domain=$WINDOWS_DOMAIN
 	EOT
   chown root: $WIN_CREDENTIALS
   chmod 600 $WIN_CREDENTIALS
