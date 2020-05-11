@@ -40,18 +40,21 @@ function help_msg() {
   echo "twitch  	twitch gui + VideoLan + Chatty"
   echo
   echo "atom    	Atom IDE"
+  echo "cifs    	access windows file share"
   echo "cuda    	CudaText editor"
   echo "moka    	nice icon set"
   echo "ohmyz   	ohmyz shell extension"
   echo "pwsafe  	Password Safe"
-  echo "samba   	Samba, access to Windows"
+  echo "samba   	Samba Server, access from Windows"
   echo "screen  	XScreensaver"
+  echo "snap    	rsnapshot+rsync backups on local system"
 }
 
 declare -A SELECT=(
   [anbox]=DO_ANBOX
   [amd]=DO_AMD
   [atom]=DO_ATOM
+  [cifs]=DO_CIFS
   [cuda]=DO_CUDA_TEXT
   [discord]=DO_DISCORD
   [dnet]=DO_DOT_NET
@@ -72,6 +75,7 @@ declare -A SELECT=(
   [spotify]=DO_SPOTIFY
   [src]=DO_SOURCE
   [steam]=DO_STEAM
+  [snap]=DO_SNAPSHOT
   [su]=ONLY_SUDOER
   [test]=DO_TEST
   [twitch]=DO_TWITCH_GUI
@@ -79,6 +83,10 @@ declare -A SELECT=(
   [wine]=DO_WINE
 )
 
+if [[ $# -eq 0  ]]; then
+  help_msg
+  exit
+fi
 
 while [[ $# -gt 0 ]]; do
   KEY=${1#-}
@@ -113,13 +121,13 @@ function reboot_now() {
 
 function logout_now() {
   echo
-  echo -n "You need to logout now (Y/n)!"
-  read ANSWER
-  if [[ "$ANSWER" == "${ANSWER#[Nn]}" ]]; then
-    logout
-  else
-    exit 1
-  fi
+  echo -n "You need to logout now!"
+#  read ANSWER
+#  if [[ "$ANSWER" == "${ANSWER#[Nn]}" ]]; then
+#    logout   # not login shell use exit
+#  else
+#    exit 1
+#  fi
 }
 
 function continue_now() {
@@ -152,7 +160,7 @@ fi
 # apt install		# install a package
 # apt remove		# remove a package
 # apt search		# searche for a program
-# apt --fix-broken install
+# apt install --fix-broken
 
 #####################################################################
 function insert_path_fkts() {
@@ -180,20 +188,26 @@ function insert_path_fkts() {
 
 function add_bin_to_path() {
   if ! grep -E -q "path_add $2" $1 ; then
+    echo "add '$2' to '$1'"
     cat <<- EOT | sudo -u $SUDO_USER tee -a $1 > /dev/null
 
 		path_add "$2" after
 		export PATH
 		EOT
+  else
+    echo "'$1' already contain '$2'!"
   fi
 }
 
 function add_export_env() {
   if ! grep -E -q "$2" $1 ; then
+    echo "add 'export $2=\"$3\"' to '$1'"
     cat <<- EOT | sudo -u $SUDO_USER tee -a $1 > /dev/null
 
 		export $2="$3"
 		EOT
+  else
+    echo "'$1' already contain 'export $2=\"$3\"'!"
   fi
 }
 
@@ -586,14 +600,20 @@ if [[ ! -z "$DO_WINE" ]]; then
   # echo "deb $WINE_BUILDS/debian/ testing  main" | tee $SOURCES_DIR/wine.list > /dev/null  # <-- broken, not working
   apt update
 
-  apt install --install-recommends winehq-staging
-  apt install --install-recommends wine-staging wine-staging-i386 wine-staging-amd64
+  # apt-cache policy winehq-staging
+  WINE_VER='5.7~bullseye'
+  apt install --install-recommends wine-staging=$WINE_VER wine-staging-i386=$WINE_VER wine-staging-amd64=$WINE_VER
+  apt install --install-recommends winehq-staging=$WINE_VER
   # apt install wine
+
+  sudo -u $SUDO_USER winecfg		# mono,gecko will be installed
+  if [[ "$?" != "0" ]]; then
+    echo "something goes wrong!"
+    exit 1
+  fi
 
   add_bin_to_path '.bashrc' '/opt/wine-staging/bin'
   add_bin_to_path '.zshrc'  '/opt/wine-staging/bin'
-
-  sudo -u $SUDO_USER winecfg		# mono,gecko will be installed
 
   apt install mono-complete
   apt install winetricks
@@ -957,46 +977,126 @@ fi
 #####################################################################
 ######### Samba
 # https://devconnected.com/how-to-install-samba-on-debian-10-buster/
+
+SAMBA_CONF='/etc/samba/smb.conf'
+SAMBA_SHARE='/home/samba'
+
+function create_smb_user() {
+  SMB_USER=$1
+  echo "create a samba user '$SMB_USER' with working directory at '$SAMBA_SHARE'"
+  useradd -M -d $SAMBA_SHARE/$SMB_USER -s /usr/sbin/nologin -G sambashare $SMB_USER
+  mkdir $SAMBA_SHARE/$SMB_USER
+  smbpasswd -a $SMB_USER
+  smbpasswd -e $SMB_USER
+  chown $SMB_USER:sambashare $SAMBA_SHARE/$SMB_USER
+  chmod 2770 $SAMBA_SHARE/smbadmin
+}
+
+function create_smb_user_config() {
+  SMB_USER=$1
+  if ! grep -E -q "[$SMB_USER]" $SAMBA_CONF ; then
+    cat <<- EOT | tee -a $SAMBA_CONF > /dev/null
+		[$SMB_USER]
+		  path = $SAMBA_SHARE/$SMB_USER
+		  read only = no
+		  browseable = $2
+		  force create mode = 0660
+		  force directory mode = 2770
+		  valid users = @$SMB_USER @sambashare
+		EOT
+  fi
+}
+
 if [[ ! -z "$DO_SAMBA" ]]; then
-  echo '######### install Samba'
+  echo '######### install Samba Server'
   # groups: user sudo netdev cdrom
   apt install samba
+#  apt install smbclient cifs-utils
+  apt install ufw
 
-  samba -V
-  systemctl status smbd
+  mkdir -p $SAMBA_SHARE
+  chmod 777 $SAMBA_SHARE
+  chgrp sambashare $SAMBA_SHARE
 
-  ufw allow 139
-  ufw allow 445
-  ufw status
-
-  SAMBA_PUBLIC='/home/samba'
-  useradd -rs /bin/false samba-public
-  chown samba-public $SAMBA_PUBLIC
-  chmod u+rwx $SAMBA_PUBLIC
-  SAMBA_CONF='/etc/samba/smb.conf'
-  if ! grep -E -q "path = $SAMBA_PUBLIC" $SAMBA_CONF ; then
-    cat <<- EOT | sudo -u $SUDO_USER tee -a $SAMBA_CONF > /dev/null
-		[public]
-		  path = $SAMBA_PUBLIC
-		  available = yes
-		  browsable = yes
-		  public = yes
+  if ! grep -E -q "[Docs]" $SAMBA_CONF ; then
+    cat <<- EOT | tee -a $SAMBA_CONF > /dev/null
+		[Docs]
+		  path = $SAMBA_SHARE
 		  writable = yes
-		  force user = samba-public
+		  guest ok = yes
+		  guest only = yes
+		  create mode = 0777
+		  directory mode = 0777
 		EOT
   fi
 
+  create_smb_user $SUDO_USER
+  create_smb_user smbadmin
+
+  create_smb_user_config $SUDO_USER no
+  create_smb_user_config smbadmin   yes
+
+  nano $SAMBA_CONF
+
   testparm
   if [[ "$?" == "0" ]]; then
-    systemctl restart smbd
-    systemctl status smbd
+    systemctl restart smbd nmbd
+    systemctl status  smbd nmbd
   else
     echo "something was going wrong :("
     exit 1
   fi
 
-  apt install smbclient
+  ufw allow 'Samba'
+  ufw status
+
+  samba -V
   smbclient -L localhost
+
+  # smbclient //192.168.122.52/$SUDO_USER -U $SUDO_USER
+fi
+
+#####################################################################
+######### Access Windows File Share
+if [[ ! -z "$DO_CIFS" ]]; then
+  echo '######### install Access Windows File Share'
+  apt install cifs-util
+
+  mkdir /mnt/Old_C
+  mkdir /mnt/Old_D
+  mkdir /mnt/Old_E
+
+  WINDOWS_USER=$SUDO_USER
+  WINDOWS_DOMAIN='WORK'
+  WIN_CREDENTIALS='/etc/win-credentials'
+  echo -n 'type your windows password for $SUDO_USER:'
+  read -s WINDOWS_PW
+  cat <<- EOT | tee $WIN_CREDENTIALS > /dev/null
+	username = $WINDOWS_USER
+	password = $WINDOWS_PW
+	domain = $WINDOWS_DOMAIN
+	EOT
+  chown root: $WIN_CREDENTIALS
+  chmod 600 $WIN_CREDENTIALS
+
+  USER_UID=$(sudo -u $SUDO_USER id -u $SUDO_USER)
+  USER_GID=$(sudo -u $SUDO_USER id -g $SUDO_USER)
+  WIN_OPTIONS="uid=$USER_UID,gid=$USER_GID,forceuid,forcegid,dir_mode=0755,file_mode=0644"
+
+  mount -t cifs -o credentials=$WIN_CREDENTIALS,$WIN_OPTIONS //$WINDOWS_DOMAIN/c /mnt/Old_C
+  mount -t cifs -o credentials=$WIN_CREDENTIALS,$WIN_OPTIONS //$WINDOWS_DOMAIN/d /mnt/Old_D
+  mount -t cifs -o credentials=$WIN_CREDENTIALS,$WIN_OPTIONS //$WINDOWS_DOMAIN/e /mnt/Old_E
+
+  FSTAB='/etc/fstab'
+  if ! grep -E -q "//WORK" $FSTAB ; then
+    cat <<- EOT | tee -a $FSTAB > /dev/null
+		//$WINDOWS_DOMAIN/c  /mnt/Old_C  cifs  credentials=$WIN_CREDENTIALS,$WIN_OPTIONS 0 0
+		//$WINDOWS_DOMAIN/d  /mnt/Old_D  cifs  credentials=$WIN_CREDENTIALS,$WIN_OPTIONS 0 0
+		//$WINDOWS_DOMAIN/e  /mnt/Old_e  cifs  credentials=$WIN_CREDENTIALS,$WIN_OPTIONS 0 0
+		EOT
+  fi
+
+  df -h
 fi
 
 #####################################################################
@@ -1007,5 +1107,27 @@ if [[ ! -z "$DO_SCREENSAVER" ]]; then
 fi
 
 #####################################################################
+######### rsync + rsnapshot
+# https://wiki.archlinux.de/title/Rsnapshot
+# https://www.thomas-krenn.com/de/wiki/Backup_unter_Linux_mit_rsnapshot
+# https://wiki.ubuntuusers.de/USB-Datentr%C3%A4ger_automatisch_einbinden/
+if [[ ! -z "$DO_SNAPSHOT" ]]; then
+  echo '######### install rsync + rsnapshot'
+  apt install rsync rsnapshot
+  apt install autofs
+
+  mkdir /automnt
+  touch /etc/auto.automnt
+
+  blkid -o list -w /dev/null
+  # usb-stick -fstype=vfat,sync,uid=0,gid=46,umask=007 :/dev/disk/by-uuid/94B46829B4681052
+
+  # systemctl reload autofs
+  echo
+  echo "edit your '/etc/rsnapshot.conf'"
+fi
+
+#####################################################################
 if [[ ! -z "$DO_TEST" ]]; then
+  echo
 fi
