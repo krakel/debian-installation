@@ -42,9 +42,10 @@ function help_msg() {
   echo
   echo "atom    	Atom IDE"
   echo "cifs    	Access Windows Share"
-  echo "conky    	CudaText editor"
-  echo "cuda    	lightweight free system monitor"
+  echo "conky    	lightweight free system monitor"
+  echo "cuda    	CudaText editor"
   echo "gparted    	graphical device manager"
+#  echo "gpic        GPicview image viewer"
   echo "moka    	nice icon set"
   echo "ohmyz   	ohmyz shell extension"
   echo "pwsafe  	Password Safe"
@@ -532,8 +533,8 @@ if [[ ! -z "$DO_ANBOX" ]]; then
 
 #  ANBOX_BUILDS="http://ppa.launchpad.net/morphis/anbox-support/ubuntu"
 #  cat <<- EOT > $SOURCES_DIR/anbox.list
-#	deb     [arch=amd64,i386] $ANBOX_BUILDS disco main
-#	deb-src [arch=amd64,i386] $ANBOX_BUILDS disco main
+#	deb     [arch=amd64,i386] $ANBOX_BUILDS focal main
+#	deb-src [arch=amd64,i386] $ANBOX_BUILDS focal main
 #	EOT
 #  apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 21C6044A875B67B7
 #  apt update
@@ -884,7 +885,7 @@ if [[ ! -z "$DO_ATOM" ]]; then
   ATOM_REL='v1.46.0'
   ATOM_DEF="atom-amd64.deb"
   ATOM_SRC='atom_*.deb'
-  ATOM_DRV=$(download_driver $ATOM_URL $ATOM_URL/tag/$ATOM_REL/$ATOM_DEF $ATOM_SRC)
+  ATOM_DRV=$(download_driver $ATOM_URL $ATOM_URL/download/$ATOM_REL/$ATOM_DEF $ATOM_SRC)
 
   dpkg -i $ATOM_DRV
 
@@ -898,6 +899,36 @@ fi
 if [[ ! -z "$DO_CONKY" ]]; then
   echo '######### install Conky'
   apt install conky-all
+
+# project dead
+#  CONKY_URL=https://github.com/teejee2008/conky-manager/releases
+#  CONKY_REL='v2.4'
+#  CONKY_DEF="conky-manager-v2.4-amd64.deb"
+#  CONKY_SRC='conky-manager-*-amd64.deb'
+#  CONKY_DRV=$(download_driver $CONKY_URL $CONKY_URL/download/$CONKY_REL/$CONKY_DEF $CONKY_SRC)
+
+#  CONKY_FONT_URL=http://mxrepo.com/mx/repo/pool/main/m/mx-conky/
+#  CONKY_FONT_REL='20.4'
+#  CONKY_FONT_DEF="mx-conky_20.4_amd64.deb"
+#  CONKY_FONT_SRC='mx-conky_*_amd64.deb'
+#  CONKY_FONT_DRV=$(download_driver $CONKY_FONT_URL $CONKY_FONT_URL/$CONKY_FONT_DEF $CONKY_FONT_SRC)
+#  dpkg -i $CONKY_FONT_DRV
+
+#  CONKY_URL=http://mxrepo.com/mx/repo/pool/main/c/conky-manager/
+#  CONKY_REL='2.7'
+#  CONKY_DEF="conky-manager_2.7+dfsg1-3mx19+2_amd64.deb"
+#  CONKY_SRC='conky-manager_*+dfsg1-3mx19+2_amd64.deb'
+#  CONKY_DRV=$(download_driver $CONKY_URL $CONKY_URL/$CONKY_DEF $CONKY_SRC)
+#  dpkg -i $CONKY_DRV
+
+#  CONKY_BUILDS="http://ppa.launchpad.net/tomtomtom/conky-manager/ubuntu"
+#  cat <<- EOT > $SOURCES_DIR/conky.list
+#	deb     [arch=amd64,i386] $CONKY_BUILDS focal main
+#	deb-src [arch=amd64,i386] $CONKY_BUILDS focal main
+#	EOT
+#  apt-key adv --keyserver keyserver.ubuntu.com --recv-keys b90e9186f0e836fb
+#  apt update
+#  apt install conky-manager
 
   conky --version
 fi
@@ -967,7 +998,7 @@ fi
 # https://snwh.org/moka
 if [[ ! -z "$DO_MOKA" ]]; then
   echo '######### install Moka'
-  LAUNCHMAD_LIBS=ttps://launchpadlibrarian.net
+  LAUNCHMAD_LIBS=https://launchpadlibrarian.net
 
   sudo -u $SUDO_USER wget -P Downloads -nv $LAUNCHMAD_LIBS/425937281/moka-icon-theme_5.4.523-201905300105~daily~ubuntu18.04.1_all.deb -O moka-icon-theme_5.4.523.deb
   sudo -u $SUDO_USER wget -P Downloads -nv $LAUNCHMAD_LIBS/375793783/faba-icon-theme_4.3.317-201806241721~daily~ubuntu18.04.1_all.deb -O faba-icon-theme_4.3.317.deb
