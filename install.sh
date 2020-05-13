@@ -20,6 +20,7 @@ function help_msg() {
   echo "amd     	amd/ati driver         (1 reboot)"
   echo "nvidia  	nvidia driver          (1 reboot)"
   echo "nvidia2 	nvidia driver official (1 reboot, 2 runs)"
+  echo "login       Autologin"
   echo
   echo "kvm     	KVM, QEMU with Virt-Manager (1 reboot)"
   echo "virtual 	VirtualBox with SID library (removed from debian testing)"
@@ -40,8 +41,10 @@ function help_msg() {
   echo "twitch  	twitch gui + VideoLan + Chatty"
   echo
   echo "atom    	Atom IDE"
-  echo "cifs    	access windows file share"
-  echo "cuda    	CudaText editor"
+  echo "cifs    	Access Windows Share"
+  echo "conky    	CudaText editor"
+  echo "cuda    	lightweight free system monitor"
+  echo "gparted    	graphical device manager"
   echo "moka    	nice icon set"
   echo "ohmyz   	ohmyz shell extension"
   echo "pwsafe  	Password Safe"
@@ -55,13 +58,16 @@ declare -A SELECT=(
   [amd]=DO_AMD
   [atom]=DO_ATOM
   [cifs]=DO_CIFS
+  [conky]=DO_CONKY
   [cuda]=DO_CUDA_TEXT
   [discord]=DO_DISCORD
   [dnet]=DO_DOT_NET
   [dream]=DO_DREAMBOX_EDIT
   [dxvk]=DO_DXVK
+  [gparted]=DO_GPARTED
   [java]=DO_JAVA
   [kvm]=DO_KVM
+  [login]=DO_AUTO_LOGIN
   [lutris]=DO_LUTRIS
   [moka]=DO_MOKA
   [mozilla]=DO_MOZILLA
@@ -393,6 +399,7 @@ fi
 #####################################################################
 ######### AMD driver
 if [[ ! -z "$DO_AMD" ]]; then
+  echo '######### install AMD driver'
   AMD_DONE="amd-done"
 
   check_card "AMD"
@@ -413,6 +420,19 @@ if [[ ! -z "$DO_AMD" ]]; then
     sudo -u $SUDO_USER touch "$AMD_DONE"
     reboot_now
   fi
+fi
+
+#####################################################################
+######### Autologin
+if [[ ! -z "$DO_AUTO_LOGIN" ]]; then
+  echo '######### enable Autologin'
+  LIGHT_DM='/etc/lightdm/lightdm.conf'
+  if [[ ! -f "$LIGHT_DM.old" ]]; then
+    cp $LIGHT_DM $LIGHT_DM.old
+  fi
+
+  sed -i "s/^#autologin-user=.*/autologin-user=$SUDO_USER/"       $LIGHT_DM
+  sed -i "s/^#autologin-user-timeout=0/autologin-user-timeout=0/" $LIGHT_DM
 fi
 
 #####################################################################
@@ -860,7 +880,6 @@ fi
 # https://linuxhint.com/install_atom_text_editor_debian_10/
 if [[ ! -z "$DO_ATOM" ]]; then
   echo '######### install Atom IDE'
-
   ATOM_URL=https://github.com/atom/atom/releases
   ATOM_REL='v1.46.0'
   ATOM_DEF="atom-amd64.deb"
@@ -873,11 +892,21 @@ if [[ ! -z "$DO_ATOM" ]]; then
 fi
 
 #####################################################################
+######### lightweight free system monitor
+# https://github.com/brndnmtthws/conky
+# https://itsfoss.com/conky-gui-ubuntu-1304/
+if [[ ! -z "$DO_CONKY" ]]; then
+  echo '######### install Conky'
+  apt install conky-all
+
+  conky --version
+fi
+
+#####################################################################
 ######### nice text editor
 # http://uvviewsoft.com/cudatext/
 if [[ ! -z "$DO_CUDA_TEXT" ]]; then
   echo '######### install CudaText editor'
-
   CUDA_URL=https://www.fosshub.com/CudaText.html
   CUDA_DEF='cudatext_1.98.0.0-1_gtk2_amd64.deb'
   CUDA_SRC='cudatext_*_gtk2_amd64.deb'
@@ -1057,17 +1086,19 @@ if [[ ! -z "$DO_SAMBA" ]]; then
 fi
 
 #####################################################################
-######### Access Windows File Share
+######### Access Windows Share
+FSTAB='/etc/fstab'
+
 if [[ ! -z "$DO_CIFS" ]]; then
-  echo '######### install Access Windows File Share'
-  apt install cifs-util
+  echo '######### install Access Windows Share'
+  apt install cifs-utils
 
   mkdir /mnt/Old_C
   mkdir /mnt/Old_D
   mkdir /mnt/Old_E
 
   WINDOWS_USER=$SUDO_USER       # change this to your windows user name
-  WINDOWS_DOMAIN='WORK.local'	# change this to your windows domain
+  WINDOWS_DOMAIN='work.local'	# change this to your windows domain
 
   echo -n 'type your windows password for $SUDO_USER:'
   read -s WINDOWS_PW
@@ -1090,8 +1121,10 @@ if [[ ! -z "$DO_CIFS" ]]; then
   mount -t cifs -o credentials=$WIN_CREDENTIALS,$WIN_OPTIONS //$WINDOWS_DOMAIN/d /mnt/Old_D
   mount -t cifs -o credentials=$WIN_CREDENTIALS,$WIN_OPTIONS //$WINDOWS_DOMAIN/e /mnt/Old_E
 
-  FSTAB='/etc/fstab'
   if ! grep -E -q "//WORK" $FSTAB ; then
+    if [[ ! -f "$FSTAB.old" ]]; then
+      cp $FSTAB $FSTAB.old
+    fi
     cat <<- EOT | tee -a $FSTAB > /dev/null
 		//$WINDOWS_DOMAIN/c  /mnt/Old_C  cifs  credentials=$WIN_CREDENTIALS,$WIN_OPTIONS 0 0
 		//$WINDOWS_DOMAIN/d  /mnt/Old_D  cifs  credentials=$WIN_CREDENTIALS,$WIN_OPTIONS 0 0
@@ -1110,6 +1143,13 @@ if [[ ! -z "$DO_SCREENSAVER" ]]; then
 fi
 
 #####################################################################
+######### GParted
+if [[ ! -z "$DO_GPARTED" ]]; then
+  echo '######### install GParted'
+  apt install gparted
+fi
+
+#####################################################################
 ######### rsync + rsnapshot
 # https://wiki.archlinux.de/title/Rsnapshot
 # https://www.thomas-krenn.com/de/wiki/Backup_unter_Linux_mit_rsnapshot
@@ -1119,13 +1159,30 @@ if [[ ! -z "$DO_SNAPSHOT" ]]; then
   apt install rsync rsnapshot
   apt install autofs
 
-  mkdir /automnt
-  touch /etc/auto.automnt
+  AUTO_TYPE=usb
+  AUTO_DIR=/var/autofs/$AUTO_TYPE
+  AUTO_CONF=/etc/auto.$AUTO_TYPE
+  AUTO_MASTER='/etc/auto.master'
 
-  blkid -o list -w /dev/null
-  # usb-stick -fstype=vfat,sync,uid=0,gid=46,umask=007 :/dev/disk/by-uuid/94B46829B4681052
+  mkdir $AUTO_DIR
+  if ! grep -E -q "$AUTO_DIR" $AUTO_MASTER ; then
+    if [[ ! -f "$AUTO_MASTER.old" ]]; then
+      cp $AUTO_MASTER $AUTO_MASTER.old
+    fi
+    echo "$AUTO_DIR $AUTO_CONF --timeout=60 --ghost" | tee -a $AUTO_MASTER > /dev/null
+  fi
 
-  # systemctl reload autofs
+  blkid -o list
+  AUTO_BACKUP_UUID=$(blkid | grep "ext2" | grep "/dev/sd" | sed 's/.*\sUUID="\([^"]*\).*/\1/')
+  echo "usb backup uuid=$AUTO_BACKUP_UUID"
+  if [[ ! -z "$AUTO_BACKUP_UUID" ]]; then
+    echo "backup  -fstype=ext2,sync,rw,user,noauto  :/dev/disk/by-uuid/$AUTO_BACKUP_UUID" | tee $AUTO_CONF > /dev/null
+    if ! grep -E -q "$AUTO_BACKUP_UUID" $FSTAB ; then
+      echo "UUID=$AUTO_BACKUP_UUID $AUTO_DIR noauto,rw 0 0" | tee -a $FSTAB > /dev/null
+    fi
+  fi
+
+  systemctl reload autofs
   echo
   echo "edit your '/etc/rsnapshot.conf'"
 fi

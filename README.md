@@ -67,6 +67,7 @@ You can use a sign with the flags, but you don't need this.
 | FLAG | Description | Comment |
 | ---- | ----------- | ------- |
 | atom | Atom IDE | |
+| cifs | Access Windows Share | |
 | cuda | CudaText editor | many options to modify look and feel |
 | moka | nice icon set | not tested yet |
 | ohmyz | ohmyz bash extension | very very powerful |
