@@ -194,6 +194,7 @@ function insert_path_fkts() {
 }
 
 function add_bin_to_path() {
+  insert_path_fkts $1
   if ! grep -E -q "path_add $2" $1 ; then
     echo "add '$2' to '$1'"
     cat <<- EOT | sudo -u $SUDO_USER tee -a $1 > /dev/null
@@ -207,6 +208,7 @@ function add_bin_to_path() {
 }
 
 function add_export_env() {
+  insert_path_fkts $1
   if ! grep -E -q "$2" $1 ; then
     echo "add 'export $2=\"$3\"' to '$1'"
     cat <<- EOT | sudo -u $SUDO_USER tee -a $1 > /dev/null
@@ -281,7 +283,6 @@ if [[ ! -z "$DO_SOURCE" ]]; then
   apt autoremove
 
   update-ca-certificates --fresh
-  insert_path_fkts '.bashrc'
 fi
 
 #####################################################################
@@ -1021,7 +1022,6 @@ if [[ ! -z "$DO_OHMYZ" ]]; then
   sudo -u $SUDO_USER sed -i '0,/ZSH_THEME="[^"]*"/s//ZSH_THEME="robbyrussell"/' .zshrc		 # ZSH_THEME="robbyrussell"
   sudo -u $SUDO_USER sort .bash_history | uniq | awk '{print ": :0:;"$0}' >> .zsh_history
 
-  insert_path_fkts '.zshrc'
   logout_now
 fi
 
