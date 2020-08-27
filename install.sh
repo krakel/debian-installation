@@ -1,57 +1,57 @@
 #!/bin/bash
 
 # check before
-# dmesg				# print or control the kernel ring buffer
-# journalctl		# query the systemd journal
+# dmesg         # print or control the kernel ring buffer
+# journalctl    # query the systemd journal
 
 function help_msg() {
   echo "Usage:"
   echo "[sudo] install [flags]*"
   echo
-  echo "Sudo:   	run without sudo for 'install su'"
-  echo "su      	only add user to sudo group"
-  echo "        	all other with sudo"
+  echo "Sudo:     run without sudo for 'install su'"
+  echo "su        only add user to sudo group"
+  echo "          all other with sudo"
   echo
   echo "Flags:"
-  echo "help    	this help"
-  echo "test    	only script tests"
+  echo "help      this help"
+  echo "test      only script tests"
   echo
-  echo "src     	debian testing (use this first)"
-  echo "amd     	amd/ati driver         (1 reboot)"
-  echo "nvidia  	nvidia driver          (1 reboot)"
-  echo "nvidia2 	nvidia driver official (1 reboot, 2 runs)"
+  echo "src       debian testing (use this first)"
+  echo "amd       amd/ati driver         (1 reboot)"
+  echo "nvidia    nvidia driver          (1 reboot)"
+  echo "nvidia2   nvidia driver official (1 reboot, 2 runs)"
   echo "login     Autologin"
   echo
-  echo "kvm     	KVM, QEMU with Virt-Manager (1 reboot)"
-  echo "virtual 	VirtualBox with SID library (removed from debian testing)"
-  echo "anbox   	Anbox, a Android Emulator (very alpha)"
+  echo "kvm       KVM, QEMU with Virt-Manager (1 reboot)"
+  echo "virtual   VirtualBox with SID library (removed from debian testing)"
+  echo "anbox     Anbox, a Android Emulator (very alpha)"
   echo
-  echo "wine    	Wine"
-  echo "steam   	Steam"
-  echo "lutris  	Lutris"
-  echo "dxvk    	vulkan-based compatibility layer for Direct3D"
-  echo "dnet    	Microsoft .Net 4.6.1 (do not use)"
-  echo "java    	java 8+11 jdk"
-  echo "multimc 	Minecraft MultiMC"
+  echo "wine      Wine"
+  echo "steam     Steam"
+  echo "lutris    Lutris"
+  echo "dxvk      vulkan-based compatibility layer for Direct3D"
+  echo "dnet      Microsoft .Net 4.6.1 (do not use)"
+  echo "java      java 8+11 jdk"
+  echo "multimc   Minecraft MultiMC"
   echo
-  echo "discord 	Discord"
-  echo "dream   	Dreambox Edit"
-  echo "mozilla 	Firefox + Thunderbird"
-  echo "spotify 	Spotify, some music"
-  echo "twitch  	twitch gui + VideoLan + Chatty"
+  echo "discord   Discord"
+  echo "dream     Dreambox Edit"
+  echo "mozilla   Firefox + Thunderbird"
+  echo "spotify   Spotify, some music"
+  echo "twitch    twitch gui + VideoLan + Chatty"
   echo
-  echo "atom    	Atom IDE"
-  echo "cifs    	Access Windows Share"
-  echo "conky    	lightweight free system monitor"
-  echo "cuda    	CudaText editor"
+  echo "atom      Atom IDE"
+  echo "cifs      Access Windows Share"
+  echo "conky     lightweight free system monitor"
+  echo "cuda      CudaText editor"
   echo "gparted   graphical device manager"
   echo "gpic      GPicview image viewer"
-  echo "moka    	nice icon set"
-  echo "ohmyz   	ohmyz shell extension"
-  echo "pwsafe  	Password Safe"
-  echo "samba   	Samba Server, access from Windows, not needed, I use only cifs"
-  echo "screen  	XScreensaver"
-  echo "snap    	rsnapshot+rsync backups on local system"
+  echo "moka      nice icon set"
+  echo "ohmyz     ohmyz shell extension"
+  echo "pwsafe    Password Safe"
+  echo "samba     Samba Server, access from Windows, not needed, I use only cifs"
+  echo "screen    XScreensaver"
+  echo "snap      rsnapshot+rsync backups on local system"
   echo "sub       Sublime editor"
   echo "viewnior  Viewnior image viewer"
 }
@@ -109,8 +109,8 @@ while [[ $# -gt 0 ]]; do
     exit
   fi
 
-  eval "$VALUE"=true		# eval is EVIL :)
-  shift             		# past argument
+  eval "$VALUE"=true    # eval is EVIL :)
+  shift                 # past argument
 done
 
 
@@ -163,12 +163,12 @@ if [[ $(id -u) != 0 ]]; then
    exit 1
 fi
 
-# apt update		# refreshes repository index
-# apt upgrade		# upgrades all upgradable packages
-# apt autoremove	# removes unwanted packages
-# apt install		# install a package
-# apt remove		# remove a package
-# apt search		# searche for a program
+# apt update      # refreshes repository index
+# apt upgrade     # upgrades all upgradable packages
+# apt autoremove  # removes unwanted packages
+# apt install     # install a package
+# apt remove      # remove a package
+# apt search      # searche for a program
 # apt install --fix-broken
 
 #####################################################################
@@ -595,7 +595,7 @@ if [[ ! -z "$DO_VIRTUAL_BOX" ]]; then
 #  echo "deb https://download.virtualbox.org/virtualbox/debian buster contrib" | tee $SOURCES_DIR/virtualbox.list > /dev/null
 #  apt update
 
-  apt install virtualbox/sid		# found at debian sid repository
+  apt install virtualbox/sid    # found at debian sid repository
 fi
 
 #####################################################################
@@ -725,7 +725,7 @@ if [[ ! -z "$DO_WINE" ]]; then
   install_wineHQ 'staging' $WINE_VER
   #install_wineHQ 'devel'   $WINE_VER
 
-  sudo -u $SUDO_USER winecfg		# mono,gecko will be installed
+  sudo -u $SUDO_USER winecfg    # mono,gecko will be installed
   if [[ "$?" != "0" ]]; then
     echo "something goes wrong!"
     exit 1
@@ -1129,7 +1129,7 @@ if [[ ! -z "$DO_OHMYZ" ]]; then
   apt install curl
 
   sudo -u $SUDO_USER bash -c "$(curl -fsSL https://raw.github.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
-  sudo -u $SUDO_USER sed -i '0,/ZSH_THEME="[^"]*"/s//ZSH_THEME="robbyrussell"/' .zshrc		 # ZSH_THEME="robbyrussell"
+  sudo -u $SUDO_USER sed -i '0,/ZSH_THEME="[^"]*"/s//ZSH_THEME="robbyrussell"/' .zshrc     # ZSH_THEME="robbyrussell"
   sudo -u $SUDO_USER sort .bash_history | uniq | awk '{print ": :0:;"$0}' >> .zsh_history
 
   logout_now
