@@ -20,7 +20,7 @@ function help_msg() {
   echo "amd     	amd/ati driver         (1 reboot)"
   echo "nvidia  	nvidia driver          (1 reboot)"
   echo "nvidia2 	nvidia driver official (1 reboot, 2 runs)"
-  echo "login       Autologin"
+  echo "login     Autologin"
   echo
   echo "kvm     	KVM, QEMU with Virt-Manager (1 reboot)"
   echo "virtual 	VirtualBox with SID library (removed from debian testing)"
@@ -44,14 +44,16 @@ function help_msg() {
   echo "cifs    	Access Windows Share"
   echo "conky    	lightweight free system monitor"
   echo "cuda    	CudaText editor"
-  echo "gparted    	graphical device manager"
-#  echo "gpic        GPicview image viewer"
+  echo "gparted   graphical device manager"
+  echo "gpic      GPicview image viewer"
   echo "moka    	nice icon set"
   echo "ohmyz   	ohmyz shell extension"
   echo "pwsafe  	Password Safe"
-  echo "samba   	Samba Server, access from Windows"
+  echo "samba   	Samba Server, access from Windows, not needed, I use only cifs"
   echo "screen  	XScreensaver"
   echo "snap    	rsnapshot+rsync backups on local system"
+  echo "sub       Sublime editor"
+  echo "viewnior  Viewnior image viewer"
 }
 
 declare -A SELECT=(
@@ -66,6 +68,7 @@ declare -A SELECT=(
   [dream]=DO_DREAMBOX_EDIT
   [dxvk]=DO_DXVK
   [gparted]=DO_GPARTED
+  [gpic]=DO_GPIC
   [java]=DO_JAVA
   [kvm]=DO_KVM
   [login]=DO_AUTO_LOGIN
@@ -84,8 +87,10 @@ declare -A SELECT=(
   [steam]=DO_STEAM
   [snap]=DO_SNAPSHOT
   [su]=ONLY_SUDOER
+  [sub]=DO_SUBLIME
   [test]=DO_TEST
   [twitch]=DO_TWITCH_GUI
+  [viewnior]=DO_VIEWNIOR
   [virtual]=DO_VIRTUAL_BOX
   [wine]=DO_WINE
 )
@@ -115,36 +120,34 @@ HOME_USER=/home/$SUDO_USER
 cd $HOME_USER
 
 #####################################################################
-function reboot_now() {
+function continue_now() {
   echo
-  echo -n "You NEED to reboot now (Y/n)!"
+  echo -n "$1 (Y/n)!"
   read ANSWER
-  if [[ "$ANSWER" == "${ANSWER#[Nn]}" ]]; then
-    systemctl reboot
-  else
+  if [[ "$ANSWER" != "${ANSWER#[Nn]}" ]]; then
     exit 1
   fi
+}
+
+function break_now() {
+  echo
+  echo -n "$1 (y/N)!"
+  read ANSWER
+  if [[ "$ANSWER" == "${ANSWER#[Yy]}" ]]; then
+    exit 1
+  fi
+}
+
+function reboot_now() {
+  continue_now "You NEED to reboot now!"
+  systemctl reboot
 }
 
 function logout_now() {
   echo
   echo -n "You need to logout now!"
-#  read ANSWER
-#  if [[ "$ANSWER" == "${ANSWER#[Nn]}" ]]; then
-#    logout   # not login shell use exit
-#  else
-#    exit 1
-#  fi
-}
-
-function continue_now() {
-  echo
-  echo "$1"
-  echo -n "You need to continue now (Y/n)!"
-  read ANSWER
-  if [[ "$ANSWER" == "${ANSWER#[Yy]}" ]]; then
-    exit 1
-  fi
+  read
+  exit
 }
 
 if [[ ! -z "$ONLY_SUDOER" ]]; then
@@ -152,12 +155,11 @@ if [[ ! -z "$ONLY_SUDOER" ]]; then
   su - root -c bash -c "/sbin/usermod -aG sudo $SUDO_USER"    # add to group sudo
   echo
   logout_now
-  exit
 fi
 
 if [[ $(id -u) != 0 ]]; then
    echo
-   echo "I am not root!"
+   echo "Ups, I am not root!"
    exit 1
 fi
 
@@ -275,6 +277,7 @@ if [[ ! -z "$DO_SOURCE" ]]; then
   dpkg --add-architecture i386
   apt update
 
+  apt install net-tools
   apt install apt-transport-https
   apt install firmware-linux-nonfree
   apt install linux-headers-$(uname -r | sed 's/[^-]*-[^-]*-//')
@@ -298,18 +301,10 @@ function check_card() {
   GRAFIC_CARD=$(lspci -nn | egrep -i "3d|display|vga")
   echo $GRAFIC_CARD
   if [[ "$GRAFIC_CARD" =~ "$1" ]]; then
-    echo -n "Do you want to install the driver now (Y/n)?"
-    read ANSWER
-    if [[ "$ANSWER" != "${ANSWER#[Nn]}" ]]; then
-      exit
-    fi
+    continue_now "Do you want to install the driver now?"
   else
     echo "### Graphic card not match $1! ###"
-    echo -n "Do you want to install the driver (y/N)?"
-    read ANSWER
-    if [[ "$ANSWER" == "${ANSWER#[Yy]}" ]]; then
-      exit 1
-    fi
+    break_now "Do you want to install the driver?"
   fi
 }
 
@@ -443,57 +438,135 @@ fi
 
 #####################################################################
 ######### KVM - QEMU with Virt-Manager
+function add_polkit_rule() {
+  apt install libvirt-python
+
+#  RULE_PATH='/etc/polkit-1/rules.d/49-polkit-pkla-compat.rules'
+  RULE_PATH='/etc/polkit-1/rules.d/50-libvirt.rules'
+  cat <<- EOT | sudo -u $SUDO_USER tee $RULE_PATH > /dev/null
+	polkit.addRule(function(action, subject) {
+	  if (action.id == "org.libvirt.unix.manage" && subject.isInGroup("kvm")) {
+	    return polkit.Result.YES;
+	  }
+	});
+	EOT
+
+  virsh pool-list --all
+}
+
+function create_bridge() {
+  THE_BRIDGE=$1
+  THE_ETH0=$2
+
+  cat <<- EOT | sudo -u $SUDO_USER tee "/etc/network/interfaces.d/$THE_BRIDGE" > /dev/null
+	# Primary network interface
+	auto $THE_ETH0
+	iface $THE_ETH0 inet manual
+
+	# Configure bridge and give it a dhcp ip
+	auto $THE_BRIDGE
+	iface $THE_BRIDGE inet dhcp
+	  bridge_ports $THE_ETH0
+	  bridge_stp off
+	  bridge_waitport 0
+	  bridge_maxwait 5
+	  bridge_fd 0
+	EOT
+
+  systemctl restart libvirtd
+  virsh -c qemu:///system net-list --all
+}
+
+function activate_bridge() {
+  THE_BRIDGE=$1
+  ACTIVATE_BRIDGE="/tmp/activate-$THE_BRIDGE.yaml"
+
+  cat <<- EOT | sudo -u $SUDO_USER tee "$ACTIVATE_BRIDGE" > /dev/null
+	<network>
+	  <name>$THE_BRIDGE</name>
+	  <forward mode="bridge"/>
+	  <bridge name="$THE_BRIDGE"/>
+	</network>
+	EOT
+
+  virsh -c qemu:///system net-define    --file "$ACTIVATE_BRIDGE"
+  virsh -c qemu:///system net-autostart $THE_BRIDGE
+  virsh -c qemu:///system net-start     $THE_BRIDGE
+  virsh -c qemu:///system net-list      --all
+#  virsh -c qemu:///system pool-undefine $THE_BRIDGE
+}
+
+ISO_PATH='/media/data/iso'
+
+function install_centos() {
+  CENT_OS=$(ls -t $ISO_PATH/CentOS*.iso 2>/dev/null | head -1)
+  virt-install --virt-type=kvm --name centos8 --ram 2048 --vcpus=2 --os-variant=rhel7 --hvm \
+    --network=bridge=$1,model=virtio --graphics Spice \
+    --cdrom=$CENT_OS --disk path=/var/lib/libvirt/images/centos8.qcow2,size=40,bus=virtio,format=qcow2
+}
+
+function install_android86() {
+  ANDROID_IMG='android9.img'
+  ANDROID_OS=$(ls -t $ISO_PATH/android*.iso 2>/dev/null | head -1)
+  qemu-img create -f qcow2 $ANDROID_IMG 2G
+  qemu-system-x86_64 -enable-kvm -m 2048 -smp 30 -cpu host -boot menu=on \
+    -device virtio-mouse-pci -device virtio-keyboard-pci -device virtio-vga,virgl=on \
+    -display gtk -soundhw es1370 -net nic -net user -usb -usbdevice tablet \
+    -hda $ANDROID_IMG -cdrom $ANDROID_OS
+}
+
 if [[ ! -z "$DO_KVM" ]]; then
   echo '######### install KVM'
   grep -o 'vmx\|svm' /proc/cpuinfo
   continue_now "You need some processors with vmx or svm support"
 
+  mkdir -p $ISO_PATH
+  chown -R $SUDO_USER:$SUDO_USER /media/data
+
   apt install qemu-kvm
   apt install libvirt-clients libvirt-daemon libvirt-daemon-system
-  apt install libguestfs-tools libosinfo-bin bridge-utils geinisoimage
+  apt install libguestfs-tools libosinfo-bin binutils genisoimage
   apt install virtinst virt-viewer virt-manager
+  apt install bridge-utils
+
+  systemctl stop    NetworkManager
+  systemctl stop    NetworkManager-wait-online
+  systemctl stop    NetworkManager-dispatcher
+  systemctl stop    network-manager
+
+  systemctl disable NetworkManager
+  systemctl disable NetworkManager-wait-online
+  systemctl disable NetworkManager-dispatcher
+  systemctl disable network-manager
+
+  systemctl enable libvirtd
+  systemctl start libvirtd
+
+  adduser $SUDO_USER libvirt
+  adduser $SUDO_USER libvirt-qemu
+
+  newgrp libvirt
+  newgrp libvirt-qemu
+
+  usermod -aG kvm $SUDO_USER
+
+#  add_polkit_rule
+
+  cat /etc/group | grep libvirt
+  virsh list --all
+
+  IF_ETH0=$(ip addr | grep MULTICAST | head -1 | cut -d ' ' -f 2 | cut -d ':' -f 1)
+  BRIDGE='bridge0'
+
+  create_bridge   $BRIDGE $IF_ETH0
+  activate_bridge $BRIDGE
 
   add_export_env '.bashrc' 'LIBVIRT_DEFAULT_URI' 'qemu:///system'
   add_export_env '.zshrc'  'LIBVIRT_DEFAULT_URI' 'qemu:///system'
 
-  systemctl status libvirtd
-#  systemctl start libvirtd
-
-  adduser $SUDO_USER libvirt
-  adduser $SUDO_USER libvirt-qemu
-#  adduser $SUDO_USER kvm
-
-  mkdir /media/data/iso
-  chown -R $SUDO_USER:$SUDO_USER /media/data
-
   reboot_now
-
-# old try
-#  apt install qemu qemu-system qemu-utils
-#  apt install geinisoimage
-#  apt install libguestfs-tools libosinfo-bin
-#  apt install virt-top
-
-#  apt install qemu-kvm bridge-utils libvirt-daemon virtinst libvirt-daemon-system
-#  modprobe vhost_net
-#  lsmod | grep vhost
-#  echo vhost_net | sudo tee -a /etc/modules
-#  apt install virt-top libguestfs-tools libosinfo-bin qemu-system virt-manager
-
-#  systemctl enable libvirt-bin
-#  mkdir /etc/qemu
-#  echo "allow virbr0" | tee /etc/qemu/bridge.conf > /dev/null
-#  systemctl enable libvirtd.service
-#  systemctl start  libvirtd.service
-
-  # brctl addbr br0
-  # ip link set dev br0 up
-  #
-  # ip addr add 172.16.0.1/24 dev br0
-  #
-  # brctl addif br0 ensXXXX ensYYYY
-  # btctl show br0
-  # bctrl showmacs br0
+#  ip a s $BRIDGE
+#  install_centos $BRIDGE
 fi
 
 #####################################################################
@@ -541,7 +614,7 @@ if [[ ! -z "$DO_ANBOX" ]]; then
 #  apt update
 #  apt install anbox-modules-dkms
 
-  sudo -u $SUDO_USER mkdir git
+  sudo -u $SUDO_USER mkdir -p git
   sudo -u $SUDO_USER cd /git
   sudo -u $SUDO_USER git clone https://github.com/anbox/anbox-modules.git
   cd anbox-modules
@@ -622,11 +695,35 @@ if [[ ! -z "$DO_WINE" ]]; then
   # echo "deb $WINE_BUILDS/debian/ testing  main" | tee $SOURCES_DIR/wine.list > /dev/null  # <-- broken, not working
   apt update
 
+  function install_wine() {
+    WINEOPT=""
+    if [[ ! -z "$1" ]]; then
+      WINEOPT="$WINEOPT-$1"
+    fi
+    if [[ ! -z "$2" ]]; then
+      WINEOPT="$WINEOPT=$2"
+    fi
+    apt install --install-recommends wine$WINEOPT wine32$WINEOPT wine64$WINEOPT libwine$WINEOPT libwine:i386$WINEOPT fonts-wine$WINEOPT
+  }
+
+  function install_wineHQ() {
+    WINEOPT=""
+    if [[ ! -z "$1" ]]; then
+      WINEOPT="$WINEOPT-$1"
+    fi
+    if [[ ! -z "$2" ]]; then
+      WINEOPT="$WINEOPT=$2"
+    fi
+    apt install --install-recommends winehq$WINEOPT
+  }
+
   # apt-cache policy winehq-staging
   WINE_VER='5.7~bullseye'
-  apt install --install-recommends wine-staging=$WINE_VER wine-staging-i386=$WINE_VER wine-staging-amd64=$WINE_VER
-  apt install --install-recommends winehq-staging=$WINE_VER
-  # apt install wine
+  install_wine 'staging'     $WINE_VER
+  #install_wine 'development' $WINE_VER
+
+  install_wineHQ 'staging' $WINE_VER
+  #install_wineHQ 'devel'   $WINE_VER
 
   sudo -u $SUDO_USER winecfg		# mono,gecko will be installed
   if [[ "$?" != "0" ]]; then
@@ -793,7 +890,7 @@ function copy_profile() {
     exit 1
   fi
 
-  sudo -u $SUDO_USER mkdir $(dirname $PROFILE_INI)
+  sudo -u $SUDO_USER mkdir -p $(dirname $PROFILE_INI)
   sudo -u $SUDO_USER unzip $PROFILE_OLD -d $(dirname $PROFILE_INI)
   sudo -u $SUDO_USER sed -i "0,/StartWithLastProfile=[0-9]*/s//StartWithLastProfile=0/" $PROFILE_INI
 
@@ -935,6 +1032,19 @@ if [[ ! -z "$DO_CONKY" ]]; then
 fi
 
 #####################################################################
+######### better text editor
+# https://www.sublimetext.com/
+if [[ ! -z "$DO_SUBLIME" ]]; then
+  echo '######### install Sublime editor'
+
+  wget -nv https://download.sublimetext.com/sublimehq-pub.gpg -O - | apt-key add -
+  echo "deb https://download.sublimetext.com/ apt/stable/" | tee $SOURCES_DIR/sublime.list > /dev/null
+  apt update
+
+  apt install sublime-text
+fi
+
+#####################################################################
 ######### nice text editor
 # http://uvviewsoft.com/cudatext/
 if [[ ! -z "$DO_CUDA_TEXT" ]]; then
@@ -1045,7 +1155,7 @@ function create_smb_user() {
   SMB_USER=$1
   echo "create a samba user '$SMB_USER' with working directory at '$SAMBA_SHARE'"
   useradd -M -d $SAMBA_SHARE/$SMB_USER -s /usr/sbin/nologin -G sambashare $SMB_USER
-  mkdir $SAMBA_SHARE/$SMB_USER
+  mkdir -p $SAMBA_SHARE/$SMB_USER
   smbpasswd -a $SMB_USER
   smbpasswd -e $SMB_USER
   chown $SMB_USER:sambashare $SAMBA_SHARE/$SMB_USER
@@ -1124,14 +1234,16 @@ if [[ ! -z "$DO_CIFS" ]]; then
   echo '######### install Access Windows Share'
   apt install cifs-utils
 
-  mkdir /mnt/Old_C
-  mkdir /mnt/Old_D
-  mkdir /mnt/Old_E
+  # my old windows disks
+  mkdir -p /mnt/work_c
+  mkdir -p /mnt/work_d
+  mkdir -p /mnt/work_e
 
+  # I use the same name
   WINDOWS_USER=$SUDO_USER       # change this to your windows user name
   WINDOWS_DOMAIN='work.local'	# change this to your windows domain
 
-  echo -n 'type your windows password for $SUDO_USER:'
+  echo -n "type your windows password for $SUDO_USER:"
   read -s WINDOWS_PW
   echo
 
@@ -1148,18 +1260,18 @@ if [[ ! -z "$DO_CIFS" ]]; then
   USER_GID=$(sudo -u $SUDO_USER id -g $SUDO_USER)
   WIN_OPTIONS="uid=$USER_UID,gid=$USER_GID,forceuid,forcegid,dir_mode=0755,file_mode=0644"
 
-  mount -t cifs -o credentials=$WIN_CREDENTIALS,$WIN_OPTIONS //$WINDOWS_DOMAIN/c /mnt/Old_C
-  mount -t cifs -o credentials=$WIN_CREDENTIALS,$WIN_OPTIONS //$WINDOWS_DOMAIN/d /mnt/Old_D
-  mount -t cifs -o credentials=$WIN_CREDENTIALS,$WIN_OPTIONS //$WINDOWS_DOMAIN/e /mnt/Old_E
+  mount -t cifs -o credentials=$WIN_CREDENTIALS,$WIN_OPTIONS //$WINDOWS_DOMAIN/c /mnt/work_c
+  mount -t cifs -o credentials=$WIN_CREDENTIALS,$WIN_OPTIONS //$WINDOWS_DOMAIN/d /mnt/work_d
+  mount -t cifs -o credentials=$WIN_CREDENTIALS,$WIN_OPTIONS //$WINDOWS_DOMAIN/e /mnt/work_e
 
   if ! grep -E -q "//WORK" $FSTAB ; then
     if [[ ! -f "$FSTAB.old" ]]; then
       cp $FSTAB $FSTAB.old
     fi
     cat <<- EOT | tee -a $FSTAB > /dev/null
-		//$WINDOWS_DOMAIN/c  /mnt/Old_C  cifs  credentials=$WIN_CREDENTIALS,$WIN_OPTIONS 0 0
-		//$WINDOWS_DOMAIN/d  /mnt/Old_D  cifs  credentials=$WIN_CREDENTIALS,$WIN_OPTIONS 0 0
-		//$WINDOWS_DOMAIN/e  /mnt/Old_e  cifs  credentials=$WIN_CREDENTIALS,$WIN_OPTIONS 0 0
+		//$WINDOWS_DOMAIN/c  /mnt/work_c  cifs  credentials=$WIN_CREDENTIALS,$WIN_OPTIONS 0 0
+		//$WINDOWS_DOMAIN/d  /mnt/work_d  cifs  credentials=$WIN_CREDENTIALS,$WIN_OPTIONS 0 0
+		//$WINDOWS_DOMAIN/e  /mnt/work_e  cifs  credentials=$WIN_CREDENTIALS,$WIN_OPTIONS 0 0
 		EOT
   fi
 
@@ -1181,6 +1293,20 @@ if [[ ! -z "$DO_GPARTED" ]]; then
 fi
 
 #####################################################################
+######### GPicview image viewer
+if [[ ! -z "$DO_GPIC" ]]; then
+  echo '######### install GPicview'
+  apt install gpicview
+fi
+
+#####################################################################
+######### Viewnior image viewer
+if [[ ! -z "$DO_VIEWNIOR" ]]; then
+  echo '######### install Viewnior'
+  apt install viewnior
+fi
+
+#####################################################################
 ######### rsync + rsnapshot
 # https://wiki.archlinux.de/title/Rsnapshot
 # https://www.thomas-krenn.com/de/wiki/Backup_unter_Linux_mit_rsnapshot
@@ -1195,7 +1321,7 @@ if [[ ! -z "$DO_SNAPSHOT" ]]; then
   AUTO_CONF=/etc/auto.$AUTO_TYPE
   AUTO_MASTER='/etc/auto.master'
 
-  mkdir $AUTO_DIR
+  mkdir -p $AUTO_DIR
   if ! grep -E -q "$AUTO_DIR" $AUTO_MASTER ; then
     if [[ ! -f "$AUTO_MASTER.old" ]]; then
       cp $AUTO_MASTER $AUTO_MASTER.old
@@ -1220,5 +1346,5 @@ fi
 
 #####################################################################
 if [[ ! -z "$DO_TEST" ]]; then
-  echo
+  echo "nothing here for now"
 fi
