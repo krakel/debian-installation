@@ -4,17 +4,17 @@
 # dmesg         # print or control the kernel ring buffer
 # journalctl    # query the systemd journal
 
-# lvm VG root gaming-vg
+# lvm VG root vg
 
 function help_msg() {
 	echo 'Usage:'
-	echo '[sudo] install [flags]*'
+	echo 'install su'
+	echo 'sudo install [commands]*'
 	echo
-	echo "Sudo:     run without sudo for 'install su'"
+	echo 'Sudo:     !!! run without sudo'
 	echo 'su        only add user to sudo group'
-	echo '          all other with sudo'
 	echo
-	echo 'Flags:'
+	echo 'Commands:'
 	echo 'help      this help'
 	echo 'test      only script tests'
 	echo
@@ -22,8 +22,13 @@ function help_msg() {
 	echo 'amd       amd/ati driver         (1 reboot)'
 	echo 'nvidia    nvidia driver          (1 reboot)'
 	echo 'nvidia2   nvidia driver official (1 reboot, 2 runs)'
-	echo 'login     Autologin'
+	echo
+	echo 'cifs      Access Windows Share'
+	echo 'conky     lightweight free system monitor'
+	echo 'gparted   graphical device manager'
 	echo 'ohmyz     ohmyz shell extension'
+	echo 'samba     Samba Server, access from Windows (not used, I use only cifs)'
+	echo 'snap      rsnapshot+rsync backups on local system'
 	echo 'tools     xfce tools'
 	echo
 	echo 'kvm       KVM, QEMU with Virt-Manager (1 reboot)'
@@ -45,19 +50,16 @@ function help_msg() {
 	echo 'twitch    twitch gui + VideoLan + Chatty'
 	echo
 	echo 'atom      Atom IDE'
-	echo 'cuda      CudaText editor'
-	echo 'sub       Sublime editor'
+	echo 'cuda      CudaText editor (little bit unusable)'
+	echo 'sub       Sublime editor (better, need license)'
 	echo
-	echo 'cifs      Access Windows Share'
-	echo 'conky     lightweight free system monitor'
-	echo 'gparted   graphical device manager'
 	echo 'gpic      GPicview image viewer'
+	echo 'viewnior  Viewnior image viewer'
+	echo
+	echo 'login     Autologin'
 	echo 'moka      nice icon set'
 	echo 'pwsafe    Password Safe'
-	echo 'samba     Samba Server, access from Windows, not needed, I use only cifs'
 	echo 'screen    XScreensaver'
-	echo 'snap      rsnapshot+rsync backups on local system'
-	echo 'viewnior  Viewnior image viewer'
 }
 
 declare -A SELECT=(
@@ -117,7 +119,6 @@ while [[ $# -gt 0 ]]; do
 	printf -v "$value" '%s' 'true'
 	shift
 done
-
 
 SOURCES_DIR=/etc/apt/sources.list.d
 SUDO_USER=$(logname)
@@ -613,31 +614,31 @@ if [[ ! -z "$DO_KVM" ]]; then
 	chgrp -R users $ISO_PATH
 	chmod -R 2777 $ISO_PATH
 
-	apt install qemu-kvm						  # QEMU Full virtualization on x86 hardware
+	apt install qemu-kvm                  # QEMU Full virtualization on x86 hardware
 
-	apt install libvirt-clients			  # programs for the libvirt library
-	apt install libvirt-daemon 			  # virtualization daemon
-	apt install libvirt-daemon-system	# libvirt daemon configuration files
+	apt install libvirt-clients           # programs for the libvirt library
+	apt install libvirt-daemon            # virtualization daemon
+	apt install libvirt-daemon-system     # libvirt daemon configuration files
 
-	#	apt install libguestfs-tools			# allows accessing and modifying guest disk images.
-	#	apt install libosinfo-bin				  # contains the runtime files to detect operating systems and query the database.
+	# apt install libguestfs-tools        # allows accessing and modifying guest disk images.
+	# apt install libosinfo-bin           # contains the runtime files to detect operating systems and query the database.
 
-	apt install virtinst						  # a set of commandline tools to create virtual machines using libvirt
-	apt install virt-manager				  # desktop application for managing virtual machines
-	#	apt install virt-top						  # a top-like utility for showing stats of virtualized domains.
-	# apt install virt-viewer					  # displaying the graphical console of a virtual machine (part of virtinst)
+	apt install virtinst                  # a set of commandline tools to create virtual machines using libvirt
+	apt install virt-manager              # desktop application for managing virtual machines
+	# apt install virt-top                # a top-like utility for showing stats of virtualized domains.
+	# apt install virt-viewer             # displaying the graphical console of a virtual machine (part of virtinst)
 
-	#	apt install binutils						  # GNU assembler, linker and binary utilities
-	#	apt install genisoimage					  # genisoimage is a pre-mastering program for creating ISO-9660 CD-ROM filesystem images
-	# apt install spice-client				  # GObject for communicating with Spice servers
-	#	apt install spice-vdagent				  # spice-vdagent is the spice agent for Linux, it is used in conjunction with spice-compatible hypervisor
-	apt install bridge-utils				  # contains utilities for configuring the Linux Ethernet bridge in Linux.
+	# apt install binutils                # GNU assembler, linker and binary utilities
+	# apt install genisoimage             # genisoimage is a pre-mastering program for creating ISO-9660 CD-ROM filesystem images
+	# apt install spice-client            # GObject for communicating with Spice servers
+	# apt install spice-vdagent           # spice-vdagent is the spice agent for Linux, it is used in conjunction with spice-compatible hypervisor
+	apt install bridge-utils              # contains utilities for configuring the Linux Ethernet bridge in Linux.
 
-	#	or
-	#	/etc/NetworkManager/NetworkManager.conf
-	#	[ifupdown]
-	#	managed=false
-	#	service network-manager restart
+	# or
+	# /etc/NetworkManager/NetworkManager.conf
+	# [ifupdown]
+	# managed=false
+	# service network-manager restart
 
 	systemctl stop    NetworkManager
 	systemctl stop    NetworkManager-wait-online
@@ -1194,10 +1195,10 @@ if [[ ! -z "$DO_SUBLIME" ]]; then
 	EOT
 	chmod +x $DESKTOP_SUBLIME
 
-	if [[ -d "Downloads/sublime" ]]; then
+	if [[ -d "Downloads/sublime/User" ]]; then
 		CONFIG_SUBLIME="~/.config/sublime-text-3/Packages/User/"
 		sudo -u $SUDO_USER mkdir -p $CONFIG_SUBLIME
-		sudo -u $SUDO_USER cp -r Downloads/sublime/* $CONFIG_SUBLIME
+		sudo -u $SUDO_USER cp -r Downloads/sublime/User/* $CONFIG_SUBLIME
 	fi
 fi
 
