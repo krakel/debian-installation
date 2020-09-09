@@ -25,13 +25,13 @@ function help_msg() {
 	echo
 	echo 'cifs      Access Windows Share'
 	echo 'conky     lightweight free system monitor'
-	echo 'gparted   graphical device manager'
 	echo 'ohmyz     ohmyz shell extension'
 	echo 'samba     Samba Server, access from Windows (not used, I use only cifs)'
 	echo 'snap      rsnapshot+rsync backups on local system'
 	echo 'tools     xfce tools'
 	echo
 	echo 'kvm       KVM, QEMU with Virt-Manager (1 reboot)'
+	echo 'iso       install a iso'
 	echo 'virtual   VirtualBox with SID library (removed from debian testing)'
 	echo 'anbox     Anbox, a Android Emulator (very alpha)'
 	echo
@@ -73,8 +73,8 @@ declare -A SELECT=(
 	[dnet]=DO_DOT_NET
 	[dream]=DO_DREAMBOX_EDIT
 	[dxvk]=DO_DXVK
-	[gparted]=DO_GPARTED
 	[gpic]=DO_GPIC
+	[iso]=DO_ISO
 	[java]=DO_JAVA
 	[kvm]=DO_KVM
 	[login]=DO_AUTO_LOGIN
@@ -125,6 +125,10 @@ SUDO_USER=$(logname)
 HOME_USER=/home/$SUDO_USER
 cd $HOME_USER
 
+# I use the same name
+WINDOWS_USER=$SUDO_USER     # change this to your windows user name
+WINDOWS_DOMAIN='work.local'	# change this to your windows domain
+
 #####################################################################
 function continue_now() {
 	echo
@@ -160,7 +164,7 @@ if [[ ! -z "$ONLY_SUDOER" ]]; then
 	echo "enter your root password to add $SUDO_USER to group sudo"
 	su - root -c bash -c "/sbin/usermod -aG sudo $SUDO_USER"    # add to group sudo
 	echo
-	cat <<- 'EOT' | sudo visudo
+	cat <<- EOT | sudo visudo
 	Cmnd_Alias SHUTDOWN_CMDS = /sbin/poweroff, /sbin/reboot, /sbin/halt
 	Cmnd_Alias NETZWORK_CMDS = /usr/sbin/tunctl, /sbin/ifconfig, /usr/sbin/brctl, /sbin/ip
 	Cmnd_Alias PRINTING_CMDS = /usr/sbin/lpc, /usr/sbin/lprm
@@ -317,7 +321,7 @@ if [[ ! -z "$DO_SOURCE" ]]; then
 	apt install firmware-linux-nonfree
 	apt install $TARGET_BACKPORT linux-headers-$(uname -r | sed 's/[^-]*-[^-]*-//')
 	apt install build-essential
-	# apt install dkms
+	# apt install dkms  # conflict kernel 5.7 with official nvidia driver
 	apt autoremove
 
 	update-ca-certificates --fresh
@@ -326,8 +330,28 @@ fi
 #####################################################################
 if [[ ! -z "$DO_TOOLS" ]]; then
 	apt update
+	apt install gparted       # graphical device manager
 	apt install menulibre     # menu editor
+	apt install fonts-noto    # nice font
 	apt autoremove
+
+	CLEAR_SANS_URL='https://www.fontsquirrel.com/fonts/download/clear-sans'
+	sudo -u $SUDO_USER wget -P Downloads/ $CLEAR_SANS_URL/clear-sans.zip
+	if [[ -f 'Downloads/clear-sans.zip' ]]; then
+		CLEAR_SANS_DST='/usr/share/fonts/clear-sans'
+		mkdir -p $CLEAR_SANS_DST
+		unzip Downloads/clear-sans.zip -d $CLEAR_SANS_DST
+
+		xfconf-query -c xsettings -p /Gtk/FontName  -s 'Clear Sans 10'
+		xfconf-query -c xsettings -p /Xft/Hinting   -t 'bool' -s 'true'
+		xfconf-query -c xsettings -p /Xft/HintStyle -s 'hintslight'
+		xfconf-query -c xsettings -p /Xft/RGBA      -s 'rgb'
+
+		xfconf-query -c xfwm4 -p /general/title_font  -s 'Clear Sans 10'
+	fi
+
+	sudo -u $SUDO_USER mkdir -p $HOME_USER/.icons
+	sudo -u $SUDO_USER mkdir -p $HOME_USER/.themes
 fi
 
 #####################################################################
@@ -352,17 +376,21 @@ function check_card() {
 	fi
 }
 
+
+function list_file() {
+	ls -t Downloads/$1 2>/dev/null | head -1
+}
+
 # download_driver download-url default-url search-mask dst-name
 function download_driver() {
-	local searchCmd="ls -t Downloads/$3 2>/dev/null | head -1"
 	if [[ ! -z "$4" ]]; then
 		rm -f Downloads/$4
 	fi
-	local searchObj=$(searchCmd)
+	local searchObj=$(list_file $3)
 	if [[ ! -z "$1" ]] && [[ ! -f "$searchObj" ]]; then
 		sudo -u $SUDO_USER bash -c "DISPLAY=:0.0 x-www-browser $1"
 		read -p "Press [Enter] key to continue if you finished the download of the latest driver to '~/Downloads/'"
-		searchObj=$(searchCmd)
+		searchObj=$(list_file $3)
 	fi
 	if [[ ! -z "$2" ]] && [[ ! -f "$searchObj" ]]; then
 		if [[ -z "$4" ]]; then
@@ -370,7 +398,7 @@ function download_driver() {
 		else
 			sudo -u $SUDO_USER wget -P Downloads $2 -c $4
 		fi
-		searchObj=$(searchCmd)
+		searchObj=$(list_file $3)
 	fi
 	if [[ ! -f "$searchObj" ]]; then
 		echo 'missing driver!'
@@ -499,7 +527,7 @@ function add_polkit_rule() {
 
 #  rulePath='/etc/polkit-1/rules.d/49-polkit-pkla-compat.rules'
 	local rulePath='/etc/polkit-1/rules.d/50-libvirt.rules'
-	cat <<- EOT | sudo -u $SUDO_USER tee $rulePath > /dev/null
+	cat <<- 'EOT' | sudo -u $SUDO_USER tee $rulePath > /dev/null
 	polkit.addRule(function(action, subject) {
 	  if (action.id == 'org.libvirt.unix.manage' && subject.isInGroup('kvm')) {
 	    return polkit.Result.YES;
@@ -514,11 +542,12 @@ function create_bridge() {
 	local theBridge=$1
 	local thePort=$2
 
-	cat <<- EOT > "/etc/network/interfaces.d/$theBridge"
+	cat <<- 'EOT' > "/etc/network/interfaces.d/$theBridge"
+	# The loopback network interface
 	auto lo
 	iface lo inet loopback
 
-	# Primary network interface
+	# The primary network interface
 	auto $thePort
 	iface $thePort inet manual
 
@@ -549,7 +578,7 @@ function activate_bridge() {
 	local theBridge=$1
 	local activeBridge="/tmp/activate-$theBridge.yaml"
 
-	cat <<- EOT | sudo -u $SUDO_USER tee "$activeBridge" > /dev/null
+	cat <<- 'EOT' | sudo -u $SUDO_USER tee "$activeBridge" > /dev/null
 	<network>
 	  <name>$theBridge</name>
 	  <forward mode="bridge"/>
@@ -566,44 +595,8 @@ function activate_bridge() {
 
 #ISO_PATH='/media/data/iso'
 ISO_PATH='/var/kvm/images'
-
-function install_centos() {
-	local centOS=$(ls -t $ISO_PATH/CentOS*.iso 2>/dev/null | head -1)
-	virt-install \
-		--virt-type=kvm \
-		--name centos8 \
-		--ram 2048 \
-		--vcpus=2 \
-		--os-variant=rhel7 \
-		--hvm \
-		--network=bridge=$1,model=virtio \
-		--graphics Spice \
-		--cdrom=$centOS \
-		--disk path=/var/lib/libvirt/images/centos8.qcow2,size=40,bus=virtio,format=qcow2
-}
-
-function install_android86() {
-	local androidImg='android9.img'
-	local androidOS=$(ls -t $ISO_PATH/android*.iso 2>/dev/null | head -1)
-	qemu-img create -f qcow2 $androidImg 2G
-	qemu-system-x86_64 \
-		-enable-kvm \
-		-m 2048 \
-		-smp 30 \
-		-cpu host \
-		-boot menu=on \
-		-device virtio-mouse-pci \
-		-device virtio-keyboard-pci \
-		-device virtio-vga,virgl=on \
-		-display gtk \
-		-soundhw es1370 \
-		-net nic \
-		-net user \
-		-usb \
-		-usbdevice tablet \
-		-hda $androidImg \
-		-cdrom $androidOS
-}
+ETH0=$(ip addr | grep MULTICAST | head -1 | cut -d ' ' -f 2 | cut -d ':' -f 1)
+BRIDGE='bridge0'
 
 if [[ ! -z "$DO_KVM" ]]; then
 	echo '######### install KVM'
@@ -616,85 +609,168 @@ if [[ ! -z "$DO_KVM" ]]; then
 
 	apt install qemu-kvm                  # QEMU Full virtualization on x86 hardware
 
+	apt install libvirt-bin               # a C toolkit to interact with the virtualization capabilities of recent versions of Linux
 	apt install libvirt-clients           # programs for the libvirt library
 	apt install libvirt-daemon            # virtualization daemon
 	apt install libvirt-daemon-system     # libvirt daemon configuration files
 
 	# apt install libguestfs-tools        # allows accessing and modifying guest disk images.
-	# apt install libosinfo-bin           # contains the runtime files to detect operating systems and query the database.
+	apt install libosinfo-bin             # contains the runtime files to detect operating systems and query the database.
 
 	apt install virtinst                  # a set of commandline tools to create virtual machines using libvirt
 	apt install virt-manager              # desktop application for managing virtual machines
-	# apt install virt-top                # a top-like utility for showing stats of virtualized domains.
+	apt install virt-top                  # a top-like utility for showing stats of virtualized domains.
 	# apt install virt-viewer             # displaying the graphical console of a virtual machine (part of virtinst)
 
+	# apt install acpid                   # Advanced Configuration and Power Interface event daemon
 	# apt install binutils                # GNU assembler, linker and binary utilities
 	# apt install genisoimage             # genisoimage is a pre-mastering program for creating ISO-9660 CD-ROM filesystem images
 	# apt install spice-client            # GObject for communicating with Spice servers
 	# apt install spice-vdagent           # spice-vdagent is the spice agent for Linux, it is used in conjunction with spice-compatible hypervisor
 	apt install bridge-utils              # contains utilities for configuring the Linux Ethernet bridge in Linux.
 
-	# or
-	# /etc/NetworkManager/NetworkManager.conf
-	# [ifupdown]
-	# managed=false
-	# service network-manager restart
-
 	systemctl stop    NetworkManager
 	systemctl stop    NetworkManager-wait-online
 	systemctl stop    NetworkManager-dispatcher
-	systemctl stop    network-manager
 
 	systemctl disable NetworkManager
 	systemctl disable NetworkManager-wait-online
 	systemctl disable NetworkManager-dispatcher
-	systemctl disable network-manager
 
+	systemctl stop    network-manager
+	systemctl disable network-manager
 	apt autoremove --purge network-manager
 
-	# systemctl status libvirtd
 	if ! systemctl is-active libvirtd ; then
 		systemctl enable libvirtd
 		systemctl start  libvirtd
 	fi
 
+	#if ! systemctl is-active acpid ; then
+	#	systemctl enable acpid
+	#	systemctl start  acpid
+	#fi
+
+	#cat <<- EOT >> "/etc/sysctl.conf"
+	## Enable netfilter on bridges.
+	#net.bridge.bridge-nf-call-ip6tables = 1
+	#net.bridge.bridge-nf-call-iptables  = 1
+	#net.bridge.bridge-nf-call-arptables = 1
+	#EOT
+
 	usermod -aG libvirt      $SUDO_USER
 	usermod -aG libvirt-qemu $SUDO_USER
 	usermod -aG kvm          $SUDO_USER
 
-#	cat <<- 'EOT' | visudo
-#	Cmnd_Alias KVM = /usr/sbin/tunctl, /sbin/ifconfig, /usr/sbin/brctl, /sbin/ip
-#	%kvm ALL=(ALL) NOPASSWD: KVM
-#	EOT
+	# cat <<- EOT | visudo
+	# Cmnd_Alias KVM = /usr/sbin/tunctl, /sbin/ifconfig, /usr/sbin/brctl, /sbin/ip
+	# %kvm ALL=(ALL) NOPASSWD: KVM
+	# EOT
 
 	virsh net-list --all
 	virsh net-autostart --disable default
 	virsh net-destroy             default
 	#virsh net-undefine            default
 
+	# improve the performance of KVM VMs
 	modprobe vhost_net
 	if ! grep -F -q "vhost_net" /etc/modules ; then
 		echo "vhost_net" | sudo tee -a /etc/modules
 	fi
 	lsmod | grep vhost
 
-#  add_polkit_rule
+	# add_polkit_rule
 
 	cat /etc/group | grep libvirt
 	virsh list --all
 
-	IF_ETH0=$(ip addr | grep MULTICAST | head -1 | cut -d ' ' -f 2 | cut -d ':' -f 1)
-	BRIDGE='bridge0'
-
-	create_bridge   $BRIDGE $IF_ETH0
+	create_bridge   $BRIDGE $ETH0
 	activate_bridge $BRIDGE
+	# ip a s $BRIDGE
 
 	add_export_env '.bashrc' 'LIBVIRT_DEFAULT_URI' 'qemu:///system'
 	add_export_env '.zshrc'  'LIBVIRT_DEFAULT_URI' 'qemu:///system'
 
 	reboot_now
-#  ip a s $BRIDGE
-#  install_centos $BRIDGE
+fi
+
+#####################################################################
+######### KVM - install a image
+function install_centos() {
+	local centImg='centos8.qcow2'
+	local centOS=$(ls -t $ISO_PATH/CentOS-$1*.iso 2>/dev/null | head -1)
+	if [[ ! -f "$centOS" ]]; then
+		echo 'missing iso!'
+		exit 1
+	fi
+#	virsh vol-create-as default $centImg 40G --format qcow2
+	virt-install \
+		--virt-type  kvm \
+		--name       centos$1 \
+		--ram        2048 \
+		--vcpus      2 \
+		--os-variant centos8 \
+		--hvm \
+		--network    bridge=$2,model=virtio \
+		--graphics   Spice \
+		--cdrom      $centOS \
+		--disk       path=/var/lib/libvirt/images/$centImg,size=40,bus=virtio,format=qcow2
+#		--disk       vol=default/$centImg,bus=virtio,format=qcow2
+}
+
+function install_debian() {
+	local debianImg='debian.qcow2'
+	local debianOS=$(ls -t $ISO_PATH/debian-$1*.iso 2>/dev/null | head -1)
+	if [[ ! -f "$debianOS" ]]; then
+		echo 'missing iso!'
+		exit 1
+	fi
+#	virsh vol-create-as default $debianImg 40G --format qcow2
+	virt-install \
+		--virt-type  kvm \
+		--name       $1 \
+		--ram        2048 \
+		--vcpus      2 \
+		--os-variant debian10 \
+		--hvm \
+		--network    bridge=$2,model=virtio \
+		--graphics   spice \
+		--cdrom      $debianOS \
+		--disk       path=/var/lib/libvirt/images/$debianImg,size=40,bus=virtio,format=qcow2
+#		--disk       vol=default/$debianImg,bus=virtio,format=qcow2
+}
+
+function install_android86() {
+	local androidImg='android9.img'
+	local androidOS=$(ls -t $ISO_PATH/android*.iso 2>/dev/null | head -1)
+	if [[ ! -f "$androidOS" ]]; then
+		echo 'missing iso!'
+		exit 1
+	fi
+	qemu-img create -f qcow2 $androidImg 2G
+	qemu-system-x86_64 \
+		-enable-kvm \
+		-m         2048 \
+		-smp       30 \
+		-cpu       host \
+		-boot      menu=on \
+		-device    virtio-mouse-pci \
+		-device    virtio-keyboard-pci \
+		-device    virtio-vga,virgl=on \
+		-display   gtk \
+		-soundhw   es1370 \
+		-net       nic \
+		-net       user \
+		-usb \
+		-usbdevice tablet \
+		-hda       $androidImg \
+		-cdrom     $androidOS
+}
+
+if [[ ! -z "$DO_ISO" ]]; then
+	echo '######### install a iso'
+#	install_centos 8 $BRIDGE
+	install_debian bullseye $BRIDGE
 fi
 
 #####################################################################
@@ -720,7 +796,7 @@ if [[ ! -z "$DO_VIRTUAL_BOX" ]]; then
 #  dpkg -i virtualbox-ext-pack_6.1.0-1_all.deb
 
 #  wget -nv https://www.virtualbox.org/download/oracle_vbox_2016.asc -O - | apt-key add -
-#  echo 'deb https://download.virtualbox.org/virtualbox/debian buster contrib' | tee $SOURCES_DIR/virtualbox.list > /dev/null
+#  echo 'deb https://download.virtualbox.org/virtualbox/debian buster contrib' > $SOURCES_DIR/virtualbox.list
 #  apt update
 
 	apt install virtualbox/sid    # found at debian sid repository
@@ -800,7 +876,7 @@ if [[ ! -z "$DO_WINE" ]]; then
 	# repositories and images created with the Open Build Service
 	# OBS_URL='https://download.opensuse.org/repositories/Emulators:/Wine:/Debian/Debian_Testing_standard'
 	# wget -nv https://$OBS_URL/Release.key -O - | apt-key add -
-	# echo 'deb http://$OBS_URL ./' | tee $SOURCES_DIR/wine-obs.list > /dev/null
+	# echo 'deb http://$OBS_URL ./' > $SOURCES_DIR/wine-obs.list
 	# apt update
 
 	# LIB_SDL=libsdl2-2.0-0_2.0.10+dfsg1-1_amd64.deb
@@ -819,8 +895,8 @@ if [[ ! -z "$DO_WINE" ]]; then
 
 	WINE_BUILDS='https://dl.winehq.org/wine-builds'
 	wget -nv  $WINE_BUILDS/winehq.key -O - | apt-key add -
-	echo "deb $WINE_BUILDS/debian/ bullseye main" | tee $SOURCES_DIR/wine.list > /dev/null
-	# echo "deb $WINE_BUILDS/debian/ testing  main" | tee $SOURCES_DIR/wine.list > /dev/null  # <-- broken, not working
+	echo "deb $WINE_BUILDS/debian/ bullseye main" > $SOURCES_DIR/wine.list
+	# echo "deb $WINE_BUILDS/debian/ testing  main" > $SOURCES_DIR/wine.list # <-- broken, not working
 	apt update
 
 	function install_wine() {
@@ -900,7 +976,7 @@ if [[ ! -z "$DO_LUTRIS" ]]; then
 	echo '######### install Lutris'
 	LUTRIS_URL='https://download.opensuse.org/repositories/home:/strycore/Debian_Testing'
 	wget -nv $LUTRIS_URL/Release.key -O - | apt-key add -
-	echo "deb $LUTRIS_URL/ ./" | tee $SOURCES_DIR/lutris.list > /dev/null
+	echo "deb $LUTRIS_URL/ ./" > $SOURCES_DIR/lutris.list
 	apt update
 	apt install lutris
 	apt install gamemode
@@ -942,7 +1018,7 @@ if [[ ! -z "$DO_JAVA" ]]; then
 
 	JFROG_BUILDS='https://adoptopenjdk.jfrog.io/adoptopenjdk'
 	wget -nv $JFROG_BUILDS/api/gpg/key/public -O - | apt-key add -
-	echo "deb $JFROG_BUILDS/deb/ buster main" | tee $SOURCES_DIR/jfrog.list > /dev/null
+	echo "deb $JFROG_BUILDS/deb/ buster main" > $SOURCES_DIR/jfrog.list
 	apt update
 
 	JAVA_VERSION=14
@@ -1001,7 +1077,9 @@ if [[ ! -z "$DO_DREAMBOX_EDIT" ]]; then
 	DREAMBOX_SRC='dreamboxEDIT_without_setup_*.zip'
 	DREAMBOX_DRV=$(download_driver $DREAMBOX_URL '' $DREAMBOX_SRC)
 
+	echo $DREAMBOX_DRV
 	DREAMBOX_DIR=/opt/dreamboxedit
+	mkdir -p $DREAMBOX_DIR
 	unzip $DREAMBOX_DRV -d $DREAMBOX_DIR
 #  ln -s /opt/dreamboxedit_5_3_0_0/ $DREAMBOX_DIR
 
@@ -1018,19 +1096,45 @@ fi
 ######### Firefox + Thunderbird
 
 function copy_profile() {
-	PROFILE_OLD=$1
-	PROFILE_INI=$2
-	if [[ ! -f "$PROFILE_OLD" ]]; then
-		echo 'missing copy of Windows profile'
-		exit 1
+	local profileZIP=$1
+	local profileLIN=$2
+	local profileWIN=$3
+	local profileOLD="$profileLIN/win10profile"
+	local profileINI="$profileLIN/profiles.ini"
+
+	if [[ -d "$profileOLD" ]]; then
+		echo 'windows profile already exist'
+		return
 	fi
 
-	sudo -u $SUDO_USER mkdir -p $(dirname $PROFILE_INI)
-	sudo -u $SUDO_USER unzip $PROFILE_OLD -d $(dirname $PROFILE_INI)
-	sudo -u $SUDO_USER sed -i '0,/StartWithLastProfile=[0-9]*/s//StartWithLastProfile=0/' $PROFILE_INI
+	sudo -u $SUDO_USER mkdir -p $profileOLD
 
-	if ! grep -F -q '[Profile1]' $PROFILE_INI ; then
-		cat <<- 'EOT' | sudo -u $SUDO_USER tee -a $PROFILE_INI > /dev/null
+	if [[ -d "$profileWIN" ]]; then
+		local winProf=$(grep "StartWithLastProfile" $profileWIN/profiles.ini | cut -d '=' -f 2 | tr -d '\r')
+		local pathProf=$(grep -m${winProf:-1} -F '[Profile' $profileWIN/profiles.ini -A 3 | grep "Path" | cut -d '=' -f 2 | tr -d '\r')
+		if [[ -z "$pathProf" ]]; then
+			echo 'missing profile path entry'
+			return
+		fi
+		echo "cp -f -r $profileWIN/$pathProf/* $profileOLD"
+		sudo -u $SUDO_USER cp -f -r $profileWIN/$pathProf/* $profileOLD
+	elif [[ -f "$profileZIP" ]]; then
+		sudo -u $SUDO_USER unzip $profileZIP -d $pprofileOLD
+	else
+		echo 'missing copy of Windows profile'
+		return
+	fi
+
+	if [[ ! -f "$profileINI" ]]; then
+		cat <<- EOT | sudo -u $SUDO_USER tee $profileINI > /dev/null
+		[General]
+		StartWithLastProfile=0
+		Version=2
+		EOT
+	fi
+	sudo -u $SUDO_USER sed -i '0,/StartWithLastProfile=[0-9]*/s//StartWithLastProfile=0/' $profileINI
+	if ! grep -F -q 'win10profile' $profileINI ; then
+		cat <<- EOT | sudo -u $SUDO_USER tee -a $profileINI > /dev/null
 		[Profile1]
 		Name=win10profile
 		IsRelative=1
@@ -1041,16 +1145,19 @@ function copy_profile() {
 
 if [[ ! -z "$DO_MOZILLA" ]]; then
 	echo '######### install Firefox + Thunderbird'
-	apt install mozilla-firefox
-	apt install mozilla-thunderbird
+	apt remove --purge iceweasel
 
-	# Windows
-	# C:\Users\<NAME>\AppData\Roaming\Mozilla\Firefox\Profiles
-	# C:\Users\<NAME>\AppData\Roaming\Mozilla\Firefox\profiles.ini
-	#cp -r /mnt/Users/<NAME>/AppData/Roaming/Mozilla/Firefox/*.default .mozilla/firefox/win10profile
+	apt install -t unstable firefox
+	apt install -t unstable thunderbird
 
-	copy_profile 'Download/firefox.zip'     '.mozilla/firefox/profiles.ini'
-	copy_profile 'Download/thunderbird.zip' '.mozilla/thunderbird/profiles.ini'
+	FIREFOX_WINDOWS="/mnt/work_c/Users/$WINDOWS_USER/AppData/Roaming/Mozilla/Firefox"
+	FIREFOX_LINUX="$HOME_USER/.mozilla/firefox"
+
+	THUNDERBIRD_WINDOWS="/mnt/work_c/Users/$WINDOWS_USER/AppData/Roaming/Thunderbird"
+	THUNDERBIRD_LINUX="$HOME_USER/.thunderbird"
+
+	copy_profile 'Download/firefox.zip'     $FIREFOX_LINUX     $FIREFOX_WINDOWS
+	copy_profile 'Download/thunderbird.zip' $THUNDERBIRD_LINUX $THUNDERBIRD_WINDOWS
 fi
 
 #####################################################################
@@ -1060,10 +1167,10 @@ fi
 if [[ ! -z "$DO_SPOTIFY" ]]; then
 	echo '######### install Spotify'
 
-#  apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 4773BD5E130D1D45
-#  apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 931FF8E79F0876134EDDBDCCA87FF9DF48BF1C90
+#  apt-key adv --keyserver keyserver.ubuntu.com:80 --recv-keys 4773BD5E130D1D45
+#  apt-key adv --keyserver keyserver.ubuntu.com:80 --recv-keys 931FF8E79F0876134EDDBDCCA87FF9DF48BF1C90
 	wget -nv https://download.spotify.com/debian/pubkey.gpg -O - | apt-key add -
-	echo deb 'https://repository.spotify.com stable non-free' | tee $SOURCES_DIR/spotify.list > /dev/null
+	echo deb 'https://repository.spotify.com stable non-free' > $SOURCES_DIR/spotify.list
 	apt update
 
 	apt install spotify-client
@@ -1173,7 +1280,7 @@ if [[ ! -z "$DO_SUBLIME" ]]; then
 	echo '######### install Sublime editor'
 
 	wget -nv https://download.sublimetext.com/sublimehq-pub.gpg -O - | apt-key add -
-	echo 'deb https://download.sublimetext.com/ apt/stable/' | tee $SOURCES_DIR/sublime.list > /dev/null
+	echo 'deb https://download.sublimetext.com/ apt/stable/' > $SOURCES_DIR/sublime.list
 	apt update
 
 	apt install sublime-text
@@ -1181,7 +1288,7 @@ if [[ ! -z "$DO_SUBLIME" ]]; then
 	ln -s /opt/sublime_text/sublime_text /usr/bin/sublime_text
 
 	DESKTOP_SUBLIME='Desktop/sublime.desktop'
-	cat <<- 'EOT' | sudo -u $SUDO_USER tee $DESKTOP_SUBLIME > /dev/null
+	cat <<- EOT | sudo -u $SUDO_USER tee $DESKTOP_SUBLIME > /dev/null
 	[Desktop Entry]
 	Version=1.0
 	Name=Sublime
@@ -1216,7 +1323,7 @@ if [[ ! -z "$DO_CUDA_TEXT" ]]; then
 	dpkg -i $CUDA_DEB
 
 	DESKTOP_CUDA='Desktop/cudatext.desktop'
-	cat <<- 'EOT' | sudo -u $SUDO_USER tee $DESKTOP_CUDA > /dev/null
+	cat <<- EOT | sudo -u $SUDO_USER tee $DESKTOP_CUDA > /dev/null
 	[Desktop Entry]
 	Version=1.0
 	Name=Cuda Text
@@ -1235,7 +1342,7 @@ if [[ ! -z "$DO_CUDA_TEXT" ]]; then
 	CUDA_SETTING='.config/cudatext/settings'
 	sudo -u $SUDO_USER mkdir -p "$CUDA_SETTING"
 
-	cat <<- EOT | sudo -u $SUDO_USER tee "$CUDA_SETTING/user.json" > /dev/null
+	cat <<- 'EOT' | sudo -u $SUDO_USER tee "$CUDA_SETTING/user.json" > /dev/null
 	{
 	  "auto_close_brackets": "([{\"'",
 	  "font_name__linux": "Monospace",
@@ -1324,7 +1431,7 @@ function create_smb_user() {
 function create_smb_user_config() {
 	local smbUser=$1
 	if ! grep -F -q "[$smbUser]" $SAMBA_CONF ; then
-		cat <<- EOT | tee -a $SAMBA_CONF > /dev/null
+		cat <<- 'EOT' >> $SAMBA_CONF
 		[$smbUser]
 		  path = $SAMBA_SHARE/$smbUser
 		  read only = no
@@ -1348,7 +1455,7 @@ if [[ ! -z "$DO_SAMBA" ]]; then
 	chgrp sambashare $SAMBA_SHARE
 
 	if ! grep -F -q '[Docs]' $SAMBA_CONF ; then
-		cat <<- EOT | tee -a $SAMBA_CONF > /dev/null
+		cat <<- 'EOT' >> $SAMBA_CONF
 		[Docs]
 		  path = $SAMBA_SHARE
 		  writable = yes
@@ -1398,16 +1505,12 @@ if [[ ! -z "$DO_CIFS" ]]; then
 	mkdir -p /mnt/work_d
 	mkdir -p /mnt/work_e
 
-	# I use the same name
-	WINDOWS_USER=$SUDO_USER       # change this to your windows user name
-	WINDOWS_DOMAIN='work.local'	# change this to your windows domain
-
 	echo -n "type your windows password for $SUDO_USER:"
 	read -s WINDOWS_PW
 	echo
 
 	WIN_CREDENTIALS='/etc/win-credentials'
-	cat <<- EOT | tee $WIN_CREDENTIALS > /dev/null
+	cat <<- EOT > $WIN_CREDENTIALS
 	username=$WINDOWS_USER
 	password=$WINDOWS_PW
 	domain=$WINDOWS_DOMAIN
@@ -1423,11 +1526,11 @@ if [[ ! -z "$DO_CIFS" ]]; then
 	mount -t cifs -o credentials=$WIN_CREDENTIALS,$WIN_OPTIONS //$WINDOWS_DOMAIN/d /mnt/work_d
 	mount -t cifs -o credentials=$WIN_CREDENTIALS,$WIN_OPTIONS //$WINDOWS_DOMAIN/e /mnt/work_e
 
-	if ! grep -F -q '//WORK' $FSTAB ; then
+	if ! grep -F -q "//$WINDOWS_DOMAIN" $FSTAB ; then
 		if [[ ! -f "$FSTAB.old" ]]; then
 			cp $FSTAB $FSTAB.old
 		fi
-		cat <<- EOT | tee -a $FSTAB > /dev/null
+		cat <<- EOT >> $FSTAB
 		//$WINDOWS_DOMAIN/c  /mnt/work_c  cifs  credentials=$WIN_CREDENTIALS,$WIN_OPTIONS 0 0
 		//$WINDOWS_DOMAIN/d  /mnt/work_d  cifs  credentials=$WIN_CREDENTIALS,$WIN_OPTIONS 0 0
 		//$WINDOWS_DOMAIN/e  /mnt/work_e  cifs  credentials=$WIN_CREDENTIALS,$WIN_OPTIONS 0 0
@@ -1442,13 +1545,6 @@ fi
 if [[ ! -z "$DO_SCREENSAVER" ]]; then
 	echo '######### install XScreensaver'
 	apt install xscreensaver xscreensaver-gl-extra xscreensaver-data-extra
-fi
-
-#####################################################################
-######### GParted
-if [[ ! -z "$DO_GPARTED" ]]; then
-	echo '######### install GParted'
-	apt install gparted
 fi
 
 #####################################################################
@@ -1485,16 +1581,16 @@ if [[ ! -z "$DO_SNAPSHOT" ]]; then
 		if [[ ! -f "$AUTO_MASTER.old" ]]; then
 			cp $AUTO_MASTER $AUTO_MASTER.old
 		fi
-		echo "$AUTO_DIR $AUTO_CONF --timeout=60 --ghost" | tee -a $AUTO_MASTER > /dev/null
+		echo "$AUTO_DIR $AUTO_CONF --timeout=60 --ghost" >> $AUTO_MASTER
 	fi
 
 	blkid -o list
 	AUTO_BACKUP_UUID=$(blkid | grep 'ext2' | grep '/dev/sd' | sed 's/.*\sUUID="\([^"]*\).*/\1/')
 	echo "usb backup uuid=$AUTO_BACKUP_UUID"
 	if [[ ! -z "$AUTO_BACKUP_UUID" ]]; then
-		echo "backup  -fstype=ext2,sync,rw,user,noauto  :/dev/disk/by-uuid/$AUTO_BACKUP_UUID" | tee $AUTO_CONF > /dev/null
+		echo "backup  -fstype=ext2,sync,rw,user,noauto  :/dev/disk/by-uuid/$AUTO_BACKUP_UUID" > $AUTO_CONF
 		if ! grep -F -q "$AUTO_BACKUP_UUID" $FSTAB ; then
-			echo "UUID=$AUTO_BACKUP_UUID $AUTO_DIR noauto,rw 0 0" | tee -a $FSTAB > /dev/null
+			echo "UUID=$AUTO_BACKUP_UUID $AUTO_DIR ext2 noauto,rw 0 0" >> $FSTAB
 		fi
 	fi
 
