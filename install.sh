@@ -19,6 +19,7 @@ function help_msg() {
 	echo 'test      only script tests'
 	echo
 	echo 'src       debian testing (use this first)'
+	echo 'visudo    some sudo cmd definitions'
 	echo 'amd       amd/ati driver         (1 reboot)'
 	echo 'nvidia    nvidia driver          (1 reboot)'
 	echo 'nvidia2   nvidia driver official (1 reboot, 2 runs)'
@@ -99,6 +100,7 @@ declare -A SELECT=(
 	[twitch]=DO_TWITCH_GUI
 	[viewnior]=DO_VIEWNIOR
 	[virtual]=DO_VIRTUAL_BOX
+	[visudo]=DO_VISUDO
 	[wine]=DO_WINE
 )
 
@@ -164,17 +166,7 @@ if [[ ! -z "$ONLY_SUDOER" ]]; then
 	echo "enter your root password to add $SUDO_USER to group sudo"
 	su - root -c bash -c "/sbin/usermod -aG sudo $SUDO_USER"    # add to group sudo
 	echo
-	cat <<- EOT | sudo visudo
-	Cmnd_Alias SHUTDOWN_CMDS = /sbin/poweroff, /sbin/reboot, /sbin/halt
-	Cmnd_Alias NETZWORK_CMDS = /usr/sbin/tunctl, /sbin/ifconfig, /usr/sbin/brctl, /sbin/ip
-	Cmnd_Alias PRINTING_CMDS = /usr/sbin/lpc, /usr/sbin/lprm
-	$SUDO_USER ALL= NOPASSWD: SHUTDOWN_CMDS
-	$SUDO_USER ALL= NOPASSWD: NETZWORK_CMDS
-	ALL ALL=(ALL) NOPASSWD: PRINTING_CMDS
-	# Cmnd_Alias ADMIN_CMDS = /usr/sbin/passwd, /usr/sbin/useradd, /usr/sbin/userdel, /usr/sbin/usermod, /usr/sbin/visudo
-	# $SUDO_USER ALL= ADMIN_CMDS
-	# USERS WORKSTATIONS=(ADMINS) ADMIN_CMDS
-	EOT
+
 	logout_now
 fi
 
@@ -328,6 +320,26 @@ if [[ ! -z "$DO_SOURCE" ]]; then
 fi
 
 #####################################################################
+if [[ ! -z "$DO_VISUDO" ]]; then
+	SUDOERS_MAIN=/etc/sudoers.d/main-cmds
+
+	cat <<- EOT > $SUDOERS_MAIN
+	Cmnd_Alias SHUTDOWN_CMDS = /sbin/poweroff, /sbin/reboot, /sbin/halt
+	Cmnd_Alias NETZWORK_CMDS = /usr/sbin/tunctl, /sbin/ifconfig, /usr/sbin/brctl, /sbin/ip
+	Cmnd_Alias PRINTING_CMDS = /usr/sbin/lpc, /usr/sbin/lprm
+	$SUDO_USER ALL= NOPASSWD: SHUTDOWN_CMDS
+	$SUDO_USER ALL= NOPASSWD: NETZWORK_CMDS
+	ALL ALL=(ALL) NOPASSWD: PRINTING_CMDS
+	# Cmnd_Alias ADMIN_CMDS = /usr/sbin/passwd, /usr/sbin/useradd, /usr/sbin/userdel, /usr/sbin/usermod, /usr/sbin/visudo
+	# $SUDO_USER ALL= ADMIN_CMDS
+	# USERS WORKSTATIONS=(ADMINS) ADMIN_CMDS
+	EOT
+
+	chmod 0440 $SUDOERS_MAIN
+	visudo -c
+fi
+
+#####################################################################
 if [[ ! -z "$DO_TOOLS" ]]; then
 	apt update
 	apt install gparted       # graphical device manager
@@ -352,6 +364,11 @@ if [[ ! -z "$DO_TOOLS" ]]; then
 
 	sudo -u $SUDO_USER mkdir -p $HOME_USER/.icons
 	sudo -u $SUDO_USER mkdir -p $HOME_USER/.themes
+
+	if [[ -f "Downloads/gtk.css" ]]; then
+		sudo -u $SUDO_USER mkdir -p $HOME_USER/.config/gtk-3.0
+		sudo -u $SUDO_USER cp Downloads/gtk.css $HOME_USER/.config/gtk-3.0/
+	fi
 fi
 
 #####################################################################
@@ -662,10 +679,13 @@ if [[ ! -z "$DO_KVM" ]]; then
 	usermod -aG libvirt-qemu $SUDO_USER
 	usermod -aG kvm          $SUDO_USER
 
-	# cat <<- EOT | visudo
+	# SUDOERS_KVM=/etc/sudoers.d/kvm-cmds
+	# cat <<- EOT > $SUDOERS_KVM
 	# Cmnd_Alias KVM = /usr/sbin/tunctl, /sbin/ifconfig, /usr/sbin/brctl, /sbin/ip
 	# %kvm ALL=(ALL) NOPASSWD: KVM
 	# EOT
+	# chmod 0440 $SUDOERS_KVM
+	# visudo -c
 
 	virsh net-list --all
 	virsh net-autostart --disable default
@@ -1170,7 +1190,8 @@ if [[ ! -z "$DO_SPOTIFY" ]]; then
 #  apt-key adv --keyserver keyserver.ubuntu.com:80 --recv-keys 4773BD5E130D1D45
 #  apt-key adv --keyserver keyserver.ubuntu.com:80 --recv-keys 931FF8E79F0876134EDDBDCCA87FF9DF48BF1C90
 	wget -nv https://download.spotify.com/debian/pubkey.gpg -O - | apt-key add -
-	echo deb 'https://repository.spotify.com stable non-free' > $SOURCES_DIR/spotify.list
+#	echo deb 'https://repository.spotify.com stable non-free' > $SOURCES_DIR/spotify.list
+	echo deb 'https://repository.scdn.co stable non-free' > $SOURCES_DIR/spotify.list
 	apt update
 
 	apt install spotify-client
@@ -1520,7 +1541,7 @@ if [[ ! -z "$DO_CIFS" ]]; then
 
 	USER_UID=$(sudo -u $SUDO_USER id -u $SUDO_USER)
 	USER_GID=$(sudo -u $SUDO_USER id -g $SUDO_USER)
-	WIN_OPTIONS="uid=$USER_UID,gid=$USER_GID,forceuid,forcegid,dir_mode=0755,file_mode=0644"
+	WIN_OPTIONS="noauto,uid=$USER_UID,gid=$USER_GID,forceuid,forcegid,dir_mode=0755,file_mode=0644"
 
 	mount -t cifs -o credentials=$WIN_CREDENTIALS,$WIN_OPTIONS //$WINDOWS_DOMAIN/c /mnt/work_c
 	mount -t cifs -o credentials=$WIN_CREDENTIALS,$WIN_OPTIONS //$WINDOWS_DOMAIN/d /mnt/work_d
@@ -1536,6 +1557,34 @@ if [[ ! -z "$DO_CIFS" ]]; then
 		//$WINDOWS_DOMAIN/e  /mnt/work_e  cifs  credentials=$WIN_CREDENTIALS,$WIN_OPTIONS 0 0
 		EOT
 	fi
+
+	WIN_SHELL="/mnt/mount-win.sh"
+	cat <<- EOT > "$WIN_SHELL"
+	#!/bin/bash
+	mount //$WINDOWS_DOMAIN/c
+	mount //$WINDOWS_DOMAIN/d
+	mount //$WINDOWS_DOMAIN/e
+	EOT
+	chmod +x $WIN_SHELL
+
+	DESKTOP_WIN='Desktop/windows.desktop'
+	cat <<- EOT | sudo -u $SUDO_USER tee "$DESKTOP_WIN" > /dev/null
+	[Desktop Entry]
+	Name=$WINDOWS_DOMAIN
+	Comment=mount windows folder
+	Exec=sudo $WIN_SHELL > /dev/null 2>&1 && xdg-open /mnt/work_c
+	Icon=drive-removable-media
+	Terminal=false
+	Type=Application
+	Categories=Utility;Mount;
+	StartupNotify=true
+	EOT
+	chmod +x $DESKTOP_WIN
+
+	SUDOERS_WIN=/etc/sudoers.d/win-cmds
+	echo "$SUDO_USER ALL= NOPASSWD: $WIN_SHELL" > $SUDOERS_WIN
+	chmod 0440 $SUDOERS_WIN
+	visudo -c
 
 	df -h
 fi
@@ -1603,18 +1652,18 @@ fi
 if [[ ! -z "$DO_TEST" ]]; then
 	echo 'nothing here for now'
 
-	RC_LOCAL='/etc/rc.d/rc.local'
-	TEST_FILE='/opt/scripts/run-script-on-boot.sh'
-	TEST_OUTPUT='/root/on-boot-output.txt'
+#	RC_LOCAL='/etc/rc.d/rc.local'
+#	TEST_FILE='/opt/scripts/run-script-on-boot.sh'
+#	TEST_OUTPUT='/root/on-boot-output.txt'
 
-	cat <<- EOT > $TEST_FILE
-	#!/bin/bash
-	date     >> $TEST_OUTPUT
-	hostname >> $TEST_OUTPUT
-	EOT
+#	cat <<- EOT > $TEST_FILE
+#	#!/bin/bash
+#	date     >> $TEST_OUTPUT
+#	hostname >> $TEST_OUTPUT
+#	EOT
 
-	chmod +x $TEST_FILE
-	chmod +x $RC_LOCAL
-	echo $TEST_FILE | sudo -u $SUDO_USER tee -a $RC_LOCAL > /dev/null
-	reboot
+#	chmod +x $TEST_FILE
+#	chmod +x $RC_LOCAL
+#	echo $TEST_FILE | sudo -u $SUDO_USER tee -a $RC_LOCAL > /dev/null
+#	reboot
 fi

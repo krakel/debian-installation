@@ -1,0 +1,46 @@
+/* xfdesktop rubberband */
+XfdesktopIconView.view .rubberband {
+  border: 1px solid #1a74d3;
+  border-radius: 0;
+  background-color: rgba(26, 116, 211, 0.2);
+}
+
+/* default state */
+XfdesktopIconView.view {
+  -XfdesktopIconView-label-alpha:0;
+  -XfdesktopIconView-selected-label-alpha:0;
+  -XfdesktopIconView-ellipsize-icon-labels:0;
+  -XfdesktopIconView-tooltip-size:128;
+
+  -XfdesktopIconView-cell-spacing:0;
+  -XfdesktopIconView-cell-padding:0;
+  -XfdesktopIconView-cell-text-width-proportion:2.5;
+
+  background: transparent;
+  color: #FFFFFF;
+  border-radius: 3px;
+}
+
+/* active (selected) state */
+XfdesktopIconView.view:active {
+  background: rgba(0, 0, 0, 0);
+  text-shadow: 0 1px 1px black;
+}
+
+/* default label state */
+XfdesktopIconView.view .label {
+  background: rgba(0, 0, 0, 0);
+  text-shadow: 1px 1px 2px black;
+}
+
+/* active (selected) label state */
+XfdesktopIconView.view .label:active {
+  color: white;
+  background: rgba(0, 0, 0, 0.2);
+  text-shadow: 0px 1px 1px black;
+}
+
+menuitem {
+  padding-top: 1px;
+  padding-bottom: 1px;
+}
