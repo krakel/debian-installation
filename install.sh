@@ -1572,7 +1572,7 @@ if [[ ! -z "$DO_CIFS" ]]; then
 	[Desktop Entry]
 	Name=$WINDOWS_DOMAIN
 	Comment=mount windows folder
-	Exec=sudo $WIN_SHELL > /dev/null 2>&1 && xdg-open /mnt/work_c
+	Exec=bash -c "sudo $WIN_SHELL > /dev/null 2>&1 & xdg-open /mnt/work_c"
 	Icon=drive-removable-media
 	Terminal=false
 	Type=Application
