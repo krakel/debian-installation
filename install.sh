@@ -6,7 +6,7 @@
 
 # lvm VG root vg
 
-function help_msg() {
+function helpMsg() {
 	echo 'Usage:'
 	echo 'install su'
 	echo 'sudo install [commands]*'
@@ -105,7 +105,7 @@ declare -A SELECT=(
 )
 
 if [[ $# -eq 0  ]]; then
-	help_msg
+	helpMsg
 	exit
 fi
 
@@ -114,7 +114,7 @@ while [[ $# -gt 0 ]]; do
 	value=${SELECT[$key]}
 
 	if [[ -z "$value" ]]; then
-		help_msg
+		helpMsg
 		exit
 	fi
 
@@ -131,31 +131,15 @@ cd $HOME_USER
 WINDOWS_USER=$SUDO_USER     # change this to your windows user name
 WINDOWS_DOMAIN='work.local'	# change this to your windows domain
 
-#####################################################################
-function continue_now() {
-	echo
-	echo -n "$1 (Y/n)!"
-	read answer
-	if [[ "$answer" != "${answer#[Nn]}" ]]; then
-		exit 1
-	fi
-}
+# apt update      # refreshes repository index
+# apt upgrade     # upgrades all upgradable packages
+# apt autoremove  # removes unwanted packages
+# apt install     # install a package
+# apt remove      # remove a package
+# apt search      # searche for a program
+# apt install --fix-broken
 
-function break_now() {
-	echo
-	echo -n "$1 (y/N)!"
-	read answer
-	if [[ "$answer" == "${answer#[Yy]}" ]]; then
-		exit 1
-	fi
-}
-
-function reboot_now() {
-	continue_now 'You NEED to reboot now!'
-	systemctl reboot
-}
-
-function logout_now() {
+function logoutNow() {
 	echo
 	echo -n 'You need to logout now!'
 	read
@@ -167,7 +151,7 @@ if [[ ! -z "$ONLY_SUDOER" ]]; then
 	su - root -c bash -c "/sbin/usermod -aG sudo $SUDO_USER"    # add to group sudo
 	echo
 
-	logout_now
+	logoutNow
 fi
 
 if [[ $(id -u) != 0 ]]; then
@@ -176,17 +160,34 @@ if [[ $(id -u) != 0 ]]; then
 	 exit 1
 fi
 
-# apt update      # refreshes repository index
-# apt upgrade     # upgrades all upgradable packages
-# apt autoremove  # removes unwanted packages
-# apt install     # install a package
-# apt remove      # remove a package
-# apt search      # searche for a program
-# apt install --fix-broken
-
 #####################################################################
-# insert_path_fkts file
-function insert_path_fkts() {
+## some functions
+#####################################################################
+function continueNow() {
+	echo
+	echo -n "$1 (Y/n)!"
+	read answer
+	if [[ "$answer" != "${answer#[Nn]}" ]]; then
+		exit 1
+	fi
+}
+
+function breakNow() {
+	echo
+	echo -n "$1 (y/N)!"
+	read answer
+	if [[ "$answer" == "${answer#[Yy]}" ]]; then
+		exit 1
+	fi
+}
+
+function rebootNow() {
+	continueNow 'You NEED to reboot now!'
+	systemctl reboot
+}
+
+# insertPathFkts file
+function insertPathFkts() {
 	if ! grep -F -q 'path_add()' $1 ; then
 		cat <<- 'EOT' | sudo -u $SUDO_USER tee -a $1 > /dev/null
 
@@ -209,9 +210,9 @@ function insert_path_fkts() {
 	fi
 }
 
-# add_bin_to_path file path
-function add_bin_to_path() {
-	insert_path_fkts $1
+# addBinToPath file path
+function addBinToPath() {
+	insertPathFkts $1
 	local addPathStr="path_add \"$2\""
 
 	if ! grep -F -q "$addPathStr" $1 ; then
@@ -226,9 +227,9 @@ function add_bin_to_path() {
 	fi
 }
 
-# add_export_env file env value
-function add_export_env() {
-	insert_path_fkts $1
+# addExportEnv file env value
+function addExportEnv() {
+	insertPathFkts $1
 	local exportStr="export $2=\"$3\""
 
 	if ! grep -F -q "$exportStr" $1 ; then
@@ -240,6 +241,64 @@ function add_export_env() {
 	else
 		echo "'$1' already contain '$exportStr'!"
 	fi
+}
+
+# installLib lib-name
+function installLib() {
+	ldconfig -p | grep -F "$1"
+	if [[ "$?" != "0" ]]; then
+		apt install $1
+		apt autoremove
+	fi
+}
+
+function listFile() {
+	ls -t Downloads/$1 2>/dev/null | head -1
+}
+
+# downloadDriver download-url default-url search-mask dst-name
+function downloadDriver() {
+	if [[ ! -z "$4" ]]; then
+		rm -f Downloads/$4
+	fi
+	local searchObj=$(listFile $3)
+	if [[ ! -z "$1" ]] && [[ ! -f "$searchObj" ]]; then
+		sudo -u $SUDO_USER bash -c "DISPLAY=:0.0 x-www-browser $1"
+		read -p "Press [Enter] key to continue if you finished the download of the latest driver to '~/Downloads/'"
+		searchObj=$(listFile $3)
+	fi
+	if [[ ! -z "$2" ]] && [[ ! -f "$searchObj" ]]; then
+		if [[ -z "$4" ]]; then
+			sudo -u $SUDO_USER wget -P Downloads $2
+		else
+			sudo -u $SUDO_USER wget -P Downloads $2 -c $4
+		fi
+		searchObj=$(listFile $3)
+	fi
+	if [[ ! -f "$searchObj" ]]; then
+		echo 'missing driver!'
+		exit 1
+	fi
+	echo $searchObj
+}
+
+function createDesktopEntry() {
+	local entryName=$1
+	shift
+
+	cat $@ | sudo -u $SUDO_USER tee "Desktop/$entryName" > /dev/null
+	chmod +x "Desktop/$entryName"
+	cp "Desktop/$entryName" /usr/share/applications/
+	chmod 644 /usr/share/applications/$entryName
+}
+
+function createSudoer() {
+	local sudoerFile="/etc/sudoers.d/$1"
+	shift
+
+	cat $@ > $sudoerFile
+	chmod 0440 $sudoerFile
+	visudo -c
 }
 
 #####################################################################
@@ -320,10 +379,9 @@ if [[ ! -z "$DO_SOURCE" ]]; then
 fi
 
 #####################################################################
+#####################################################################
 if [[ ! -z "$DO_VISUDO" ]]; then
-	SUDOERS_MAIN=/etc/sudoers.d/main-cmds
-
-	cat <<- EOT > $SUDOERS_MAIN
+	createSudoer "main-cmds" <<- EOT
 	Cmnd_Alias SHUTDOWN_CMDS = /sbin/poweroff, /sbin/reboot, /sbin/halt
 	Cmnd_Alias NETZWORK_CMDS = /usr/sbin/tunctl, /sbin/ifconfig, /usr/sbin/brctl, /sbin/ip
 	Cmnd_Alias PRINTING_CMDS = /usr/sbin/lpc, /usr/sbin/lprm
@@ -334,11 +392,9 @@ if [[ ! -z "$DO_VISUDO" ]]; then
 	# $SUDO_USER ALL= ADMIN_CMDS
 	# USERS WORKSTATIONS=(ADMINS) ADMIN_CMDS
 	EOT
-
-	chmod 0440 $SUDOERS_MAIN
-	visudo -c
 fi
 
+#####################################################################
 #####################################################################
 if [[ ! -z "$DO_TOOLS" ]]; then
 	apt update
@@ -372,58 +428,6 @@ if [[ ! -z "$DO_TOOLS" ]]; then
 fi
 
 #####################################################################
-# install_lib lib-name
-function install_lib() {
-	ldconfig -p | grep -F "$1"
-	if [[ "$?" != "0" ]]; then
-		apt install $1
-		apt autoremove
-	fi
-}
-
-# check_card card-name
-function check_card() {
-	local graficCard=$(lspci -nn | grep -E -i '3d|display|vga')
-	echo $graficCard
-	if [[ "$graficCard" =~ "$1" ]]; then
-		continue_now 'Do you want to install the driver now?'
-	else
-		echo "### Graphic card not match $1! ###"
-		break_now 'Do you want to install the driver?'
-	fi
-}
-
-
-function list_file() {
-	ls -t Downloads/$1 2>/dev/null | head -1
-}
-
-# download_driver download-url default-url search-mask dst-name
-function download_driver() {
-	if [[ ! -z "$4" ]]; then
-		rm -f Downloads/$4
-	fi
-	local searchObj=$(list_file $3)
-	if [[ ! -z "$1" ]] && [[ ! -f "$searchObj" ]]; then
-		sudo -u $SUDO_USER bash -c "DISPLAY=:0.0 x-www-browser $1"
-		read -p "Press [Enter] key to continue if you finished the download of the latest driver to '~/Downloads/'"
-		searchObj=$(list_file $3)
-	fi
-	if [[ ! -z "$2" ]] && [[ ! -f "$searchObj" ]]; then
-		if [[ -z "$4" ]]; then
-			sudo -u $SUDO_USER wget -P Downloads $2
-		else
-			sudo -u $SUDO_USER wget -P Downloads $2 -c $4
-		fi
-		searchObj=$(list_file $3)
-	fi
-	if [[ ! -f "$searchObj" ]]; then
-		echo 'missing driver!'
-		exit 1
-	fi
-	echo $searchObj
-}
-
 #####################################################################
 if [[ ! -z "$DO_NVIDIA_OFFICAL" ]]; then
 	DO_NVIDIA=true
@@ -435,15 +439,30 @@ if [[ ! -z "$DO_AMD" ]] && [[ ! -z "$DO_NVIDIA" ]]; then
 fi
 
 #####################################################################
+#####################################################################
+# graphicCheckCard card-name
+function graphicCheckCard() {
+	local graficCard=$(lspci -nn | grep -E -i '3d|display|vga')
+	echo $graficCard
+	if [[ "$graficCard" =~ "$1" ]]; then
+		continueNow 'Do you want to install the driver now?'
+	else
+		echo "### Graphic card not match $1! ###"
+		breakNow 'Do you want to install the driver?'
+	fi
+}
+
+#####################################################################
+#####################################################################
 ######### NVIDIA driver 440.xx
 if [[ ! -z "$DO_NVIDIA" ]]; then
 	NVIDIA_STEP1='nvidia-step1'
 	NVIDIA_STEP2='nvidia-step2'
 
-	check_card 'NVIDIA'
+	graphicCheckCard 'NVIDIA'
 	echo "######### install NVIDIA driver for $OPSYSTEM"
 	dpkg --add-architecture i386
-	install_lib nvidia-detect
+	installLib nvidia-detect
 	nvidia-detect
 	read -p 'Press [Enter] key to continue...'
 
@@ -455,13 +474,13 @@ if [[ ! -z "$DO_NVIDIA" ]]; then
 		apt install nvidia-driver
 		apt autoremove
 		sudo -u $SUDO_USER touch $NVIDIA_STEP2
-		reboot_now
+		rebootNow
 	else
 		NVIDIA_URL='https://www.nvidia.com/en-us/drivers/unix/'
 		NVIDIA_REL='450.66' # 440.82 440.100
 		NVIDIA_DEF="http://us.download.nvidia.com/XFree86/Linux-x86_64/$NVIDIA_REL/NVIDIA-Linux-x86_64-$NVIDIA_REL.run"
 		NVIDIA_SRC='NVIDIA-Linux-x86_64-*.run'
-		NVIDIA_DRV=$(download_driver $NVIDIA_URL $NVIDIA_DEF $NVIDIA_SRC)
+		NVIDIA_DRV=$(downloadDriver $NVIDIA_URL $NVIDIA_DEF $NVIDIA_SRC)
 		if [[ -f "$NVIDIA_STEP1" ]]; then
 			# official nvidia.com package step 2
 			apt remove --purge '^nvidia.*'
@@ -489,17 +508,18 @@ if [[ ! -z "$DO_NVIDIA" ]]; then
 			sudo -u $SUDO_USER touch $NVIDIA_STEP1
 			systemctl set-default multi-user.target
 		fi
-		reboot_now
+		rebootNow
 	fi
 fi
 
+#####################################################################
 #####################################################################
 ######### AMD driver
 if [[ ! -z "$DO_AMD" ]]; then
 	echo '######### install AMD driver'
 	AMD_DONE='amd-done'
 
-	check_card 'AMD'
+	graphicCheckCard 'AMD'
 	if [[ -f "$AMD_DONE" ]]; then
 		echo 'You finished the installation of the AMD driver!'
 		rm -f $AMD_DONE
@@ -516,10 +536,11 @@ if [[ ! -z "$DO_AMD" ]]; then
 		apt install vulkan-utils
 		apt autoremove
 		sudo -u $SUDO_USER touch "$AMD_DONE"
-		reboot_now
+		rebootNow
 	fi
 fi
 
+#####################################################################
 #####################################################################
 ######### Autologin
 if [[ ! -z "$DO_AUTO_LOGIN" ]]; then
@@ -538,78 +559,8 @@ fi
 #####################################################################
 
 #####################################################################
+#####################################################################
 ######### KVM - QEMU with Virt-Manager
-function add_polkit_rule() {
-	apt install libvirt-python
-
-#  rulePath='/etc/polkit-1/rules.d/49-polkit-pkla-compat.rules'
-	local rulePath='/etc/polkit-1/rules.d/50-libvirt.rules'
-	cat <<- 'EOT' | sudo -u $SUDO_USER tee $rulePath > /dev/null
-	polkit.addRule(function(action, subject) {
-	  if (action.id == 'org.libvirt.unix.manage' && subject.isInGroup('kvm')) {
-	    return polkit.Result.YES;
-	  }
-	});
-	EOT
-
-	virsh pool-list --all
-}
-
-function create_bridge() {
-	local theBridge=$1
-	local thePort=$2
-
-	cat <<- 'EOT' > "/etc/network/interfaces.d/$theBridge"
-	# The loopback network interface
-	auto lo
-	iface lo inet loopback
-
-	# The primary network interface
-	auto $thePort
-	iface $thePort inet manual
-
-	auto $theBridge
-	# Configure bridge and give it a dhcp ip
-	#iface $theBridge inet dhcp
-	# Configure bridge and give it a static ip
-	iface $theBridge inet static
-	  address         192.168.0.20
-	  broadcast       192.168.0.255
-	  netmask         255.255.255.0
-	  gateway         192.168.0.1
-	  dns-nameservers 192.168.0.1
-	  dns-search      192.168.0.1
-	  bridge_ports    $thePort
-	  bridge_stp      off
-	  bridge_fd       0
-	  bridge_maxwait  5
-	  bridge_maxage   12
-	  bridge_waitport 0
-	EOT
-
-	systemctl restart libvirtd
-	virsh -c qemu:///system net-list --all
-}
-
-function activate_bridge() {
-	local theBridge=$1
-	local activeBridge="/tmp/activate-$theBridge.yaml"
-
-	cat <<- 'EOT' | sudo -u $SUDO_USER tee "$activeBridge" > /dev/null
-	<network>
-	  <name>$theBridge</name>
-	  <forward mode="bridge"/>
-	  <bridge name="$theBridge"/>
-	</network>
-	EOT
-
-	virsh -c qemu:///system net-define    --file "$activeBridge"
-	virsh -c qemu:///system net-autostart $theBridge
-	virsh -c qemu:///system net-start     $theBridge
-	virsh -c qemu:///system net-list      --all
-#  virsh -c qemu:///system pool-undefine $theBridge
-}
-
 #ISO_PATH='/media/data/iso'
 ISO_PATH='/var/kvm/images'
 ETH0=$(ip addr | grep MULTICAST | head -1 | cut -d ' ' -f 2 | cut -d ':' -f 1)
@@ -617,8 +568,80 @@ BRIDGE='bridge0'
 
 if [[ ! -z "$DO_KVM" ]]; then
 	echo '######### install KVM'
+
+	function kvmAddPolkitRule() {
+		apt install libvirt-python
+
+	#  rulePath='/etc/polkit-1/rules.d/49-polkit-pkla-compat.rules'
+		local rulePath='/etc/polkit-1/rules.d/50-libvirt.rules'
+		cat <<- 'EOT' | sudo -u $SUDO_USER tee $rulePath > /dev/null
+		polkit.addRule(function(action, subject) {
+		  if (action.id == 'org.libvirt.unix.manage' && subject.isInGroup('kvm')) {
+		    return polkit.Result.YES;
+		  }
+		});
+		EOT
+
+		virsh pool-list --all
+	}
+
+	function kvmCreateBridge() {
+		local theBridge=$1
+		local thePort=$2
+
+		cat <<- 'EOT' > "/etc/network/interfaces.d/$theBridge"
+		# The loopback network interface
+		auto lo
+		iface lo inet loopback
+
+		# The primary network interface
+		auto $thePort
+		iface $thePort inet manual
+
+		auto $theBridge
+		# Configure bridge and give it a dhcp ip
+		#iface $theBridge inet dhcp
+		# Configure bridge and give it a static ip
+		iface $theBridge inet static
+		  address         192.168.0.20
+		  broadcast       192.168.0.255
+		  netmask         255.255.255.0
+		  gateway         192.168.0.1
+		  dns-nameservers 192.168.0.1
+		  dns-search      192.168.0.1
+		  bridge_ports    $thePort
+		  bridge_stp      off
+		  bridge_fd       0
+		  bridge_maxwait  5
+		  bridge_maxage   12
+		  bridge_waitport 0
+		EOT
+
+		systemctl restart libvirtd
+		virsh -c qemu:///system net-list --all
+	}
+
+	function kvmActivateBridge() {
+		local theBridge=$1
+		local activeBridge="/tmp/activate-$theBridge.yaml"
+
+		cat <<- 'EOT' | sudo -u $SUDO_USER tee "$activeBridge" > /dev/null
+		<network>
+		  <name>$theBridge</name>
+		  <forward mode="bridge"/>
+		  <bridge name="$theBridge"/>
+		</network>
+		EOT
+
+		virsh -c qemu:///system net-define    --file "$activeBridge"
+		virsh -c qemu:///system net-autostart $theBridge
+		virsh -c qemu:///system net-start     $theBridge
+		virsh -c qemu:///system net-list      --all
+	#  virsh -c qemu:///system pool-undefine $theBridge
+	}
+
 	grep -E -o -c '(vmx|svm)' /proc/cpuinfo
-	continue_now 'You need some processors with vmx or svm support (number > 0)'
+	continueNow 'You need some processors with vmx or svm support (number > 0)'
 
 	mkdir -p $ISO_PATH
 	chgrp -R users $ISO_PATH
@@ -679,13 +702,11 @@ if [[ ! -z "$DO_KVM" ]]; then
 	usermod -aG libvirt-qemu $SUDO_USER
 	usermod -aG kvm          $SUDO_USER
 
-	# SUDOERS_KVM=/etc/sudoers.d/kvm-cmds
-	# cat <<- EOT > $SUDOERS_KVM
+	#	createSudoer "kvm-cmds" <<- EOT
 	# Cmnd_Alias KVM = /usr/sbin/tunctl, /sbin/ifconfig, /usr/sbin/brctl, /sbin/ip
 	# %kvm ALL=(ALL) NOPASSWD: KVM
 	# EOT
-	# chmod 0440 $SUDOERS_KVM
-	# visudo -c
+
 
 	virsh net-list --all
 	virsh net-autostart --disable default
@@ -699,100 +720,103 @@ if [[ ! -z "$DO_KVM" ]]; then
 	fi
 	lsmod | grep vhost
 
-	# add_polkit_rule
+	# kvmAddPolkitRule
 
 	cat /etc/group | grep libvirt
 	virsh list --all
 
-	create_bridge   $BRIDGE $ETH0
-	activate_bridge $BRIDGE
+	kvmCreateBridge   $BRIDGE $ETH0
+	kvmActivateBridge $BRIDGE
 	# ip a s $BRIDGE
 
-	add_export_env '.bashrc' 'LIBVIRT_DEFAULT_URI' 'qemu:///system'
-	add_export_env '.zshrc'  'LIBVIRT_DEFAULT_URI' 'qemu:///system'
+	addExportEnv '.bashrc' 'LIBVIRT_DEFAULT_URI' 'qemu:///system'
+	addExportEnv '.zshrc'  'LIBVIRT_DEFAULT_URI' 'qemu:///system'
 
-	reboot_now
+	rebootNow
 fi
 
 #####################################################################
+#####################################################################
 ######### KVM - install a image
-function install_centos() {
-	local centImg='centos8.qcow2'
-	local centOS=$(ls -t $ISO_PATH/CentOS-$1*.iso 2>/dev/null | head -1)
-	if [[ ! -f "$centOS" ]]; then
-		echo 'missing iso!'
-		exit 1
-	fi
-#	virsh vol-create-as default $centImg 40G --format qcow2
-	virt-install \
-		--virt-type  kvm \
-		--name       centos$1 \
-		--ram        2048 \
-		--vcpus      2 \
-		--os-variant centos8 \
-		--hvm \
-		--network    bridge=$2,model=virtio \
-		--graphics   Spice \
-		--cdrom      $centOS \
-		--disk       path=/var/lib/libvirt/images/$centImg,size=40,bus=virtio,format=qcow2
-#		--disk       vol=default/$centImg,bus=virtio,format=qcow2
-}
-
-function install_debian() {
-	local debianImg='debian.qcow2'
-	local debianOS=$(ls -t $ISO_PATH/debian-$1*.iso 2>/dev/null | head -1)
-	if [[ ! -f "$debianOS" ]]; then
-		echo 'missing iso!'
-		exit 1
-	fi
-#	virsh vol-create-as default $debianImg 40G --format qcow2
-	virt-install \
-		--virt-type  kvm \
-		--name       $1 \
-		--ram        2048 \
-		--vcpus      2 \
-		--os-variant debian10 \
-		--hvm \
-		--network    bridge=$2,model=virtio \
-		--graphics   spice \
-		--cdrom      $debianOS \
-		--disk       path=/var/lib/libvirt/images/$debianImg,size=40,bus=virtio,format=qcow2
-#		--disk       vol=default/$debianImg,bus=virtio,format=qcow2
-}
-
-function install_android86() {
-	local androidImg='android9.img'
-	local androidOS=$(ls -t $ISO_PATH/android*.iso 2>/dev/null | head -1)
-	if [[ ! -f "$androidOS" ]]; then
-		echo 'missing iso!'
-		exit 1
-	fi
-	qemu-img create -f qcow2 $androidImg 2G
-	qemu-system-x86_64 \
-		-enable-kvm \
-		-m         2048 \
-		-smp       30 \
-		-cpu       host \
-		-boot      menu=on \
-		-device    virtio-mouse-pci \
-		-device    virtio-keyboard-pci \
-		-device    virtio-vga,virgl=on \
-		-display   gtk \
-		-soundhw   es1370 \
-		-net       nic \
-		-net       user \
-		-usb \
-		-usbdevice tablet \
-		-hda       $androidImg \
-		-cdrom     $androidOS
-}
-
 if [[ ! -z "$DO_ISO" ]]; then
 	echo '######### install a iso'
-#	install_centos 8 $BRIDGE
-	install_debian bullseye $BRIDGE
+
+	function isoInstallCentos() {
+		local centImg='centos8.qcow2'
+		local centOS=$(ls -t $ISO_PATH/CentOS-$1*.iso 2>/dev/null | head -1)
+		if [[ ! -f "$centOS" ]]; then
+			echo 'missing iso!'
+			exit 1
+		fi
+	#	virsh vol-create-as default $centImg 40G --format qcow2
+		virt-install \
+			--virt-type  kvm \
+			--name       centos$1 \
+			--ram        2048 \
+			--vcpus      2 \
+			--os-variant centos8 \
+			--hvm \
+			--network    bridge=$2,model=virtio \
+			--graphics   Spice \
+			--cdrom      $centOS \
+			--disk       path=/var/lib/libvirt/images/$centImg,size=40,bus=virtio,format=qcow2
+	#		--disk       vol=default/$centImg,bus=virtio,format=qcow2
+	}
+
+	function isoInstallDebian() {
+		local debianImg='debian.qcow2'
+		local debianOS=$(ls -t $ISO_PATH/debian-$1*.iso 2>/dev/null | head -1)
+		if [[ ! -f "$debianOS" ]]; then
+			echo 'missing iso!'
+			exit 1
+		fi
+	#	virsh vol-create-as default $debianImg 40G --format qcow2
+		virt-install \
+			--virt-type  kvm \
+			--name       $1 \
+			--ram        2048 \
+			--vcpus      2 \
+			--os-variant debian10 \
+			--hvm \
+			--network    bridge=$2,model=virtio \
+			--graphics   spice \
+			--cdrom      $debianOS \
+			--disk       path=/var/lib/libvirt/images/$debianImg,size=40,bus=virtio,format=qcow2
+	#		--disk       vol=default/$debianImg,bus=virtio,format=qcow2
+	}
+
+	function isoInstallAndroid86() {
+		local androidImg='android9.img'
+		local androidOS=$(ls -t $ISO_PATH/android*.iso 2>/dev/null | head -1)
+		if [[ ! -f "$androidOS" ]]; then
+			echo 'missing iso!'
+			exit 1
+		fi
+		qemu-img create -f qcow2 $androidImg 2G
+		qemu-system-x86_64 \
+			-enable-kvm \
+			-m         2048 \
+			-smp       30 \
+			-cpu       host \
+			-boot      menu=on \
+			-device    virtio-mouse-pci \
+			-device    virtio-keyboard-pci \
+			-device    virtio-vga,virgl=on \
+			-display   gtk \
+			-soundhw   es1370 \
+			-net       nic \
+			-net       user \
+			-usb \
+			-usbdevice tablet \
+			-hda       $androidImg \
+			-cdrom     $androidOS
+	}
+
+#	isoInstallCentos 8 $BRIDGE
+	isoInstallDebian bullseye $BRIDGE
 fi
 
+#####################################################################
 #####################################################################
 ######### VirtualBox
 # https://wiki.debian.org/VirtualBox
@@ -822,6 +846,7 @@ if [[ ! -z "$DO_VIRTUAL_BOX" ]]; then
 	apt install virtualbox/sid    # found at debian sid repository
 fi
 
+#####################################################################
 #####################################################################
 ######### Android in a Box
 # https://anbox.io/
@@ -886,6 +911,7 @@ fi
 #####################################################################
 
 #####################################################################
+#####################################################################
 ######### Wine
 ######### WineHQ
 if [[ ! -z "$DO_WINE" ]]; then
@@ -919,7 +945,7 @@ if [[ ! -z "$DO_WINE" ]]; then
 	# echo "deb $WINE_BUILDS/debian/ testing  main" > $SOURCES_DIR/wine.list # <-- broken, not working
 	apt update
 
-	function install_wine() {
+	function wineInstallWine() {
 		WINEOPT=''
 		if [[ ! -z "$1" ]]; then
 			WINEOPT="-$1"
@@ -930,7 +956,7 @@ if [[ ! -z "$DO_WINE" ]]; then
 		apt install --install-recommends wine$WINEOPT wine32$WINEOPT wine64$WINEOPT libwine$WINEOPT libwine:i386$WINEOPT fonts-wine$WINEOPT
 	}
 
-	function install_wineHQ() {
+	function wineInstallWineHQ() {
 		WINEOPT=''
 		if [[ ! -z "$1" ]]; then
 			WINEOPT="-$1"
@@ -948,8 +974,8 @@ if [[ ! -z "$DO_WINE" ]]; then
 		apt search wine-staging
 		exit 1
 	fi
-	install_wine   'staging' $WINE_VER
-	install_wineHQ 'staging' $WINE_VER
+	wineInstallWine   'staging' $WINE_VER
+	wineInstallWineHQ 'staging' $WINE_VER
 
 	sudo -u $SUDO_USER winecfg    # mono,gecko will be installed
 	if [[ "$?" != "0" ]]; then
@@ -957,8 +983,8 @@ if [[ ! -z "$DO_WINE" ]]; then
 		exit 1
 	fi
 
-	add_bin_to_path '.bashrc' '/opt/wine-staging/bin'
-	add_bin_to_path '.zshrc'  '/opt/wine-staging/bin'
+	addBinToPath '.bashrc' '/opt/wine-staging/bin'
+	addBinToPath '.zshrc'  '/opt/wine-staging/bin'
 
 	apt install mono-complete
 	apt install winetricks
@@ -966,6 +992,7 @@ if [[ ! -z "$DO_WINE" ]]; then
 	wine --version
 fi
 
+#####################################################################
 #####################################################################
 ######### Steam
 if [[ ! -z "$DO_STEAM" ]]; then
@@ -991,6 +1018,7 @@ if [[ ! -z "$DO_STEAM" ]]; then
 fi
 
 #####################################################################
+#####################################################################
 ######### Lutris
 if [[ ! -z "$DO_LUTRIS" ]]; then
 	echo '######### install Lutris'
@@ -1010,12 +1038,14 @@ if [[ ! -z "$DO_LUTRIS" ]]; then
 fi
 
 #####################################################################
+#####################################################################
 ######### dxvk is a Vulkan-based compatibility layer for Direct3D 11
 if [[ ! -z "$DO_DXVK" ]]; then
 	echo '######### install DXVK'
 	apt install dxvk/sid
 fi
 
+#####################################################################
 #####################################################################
 ######### Microsoft .Net 4.6.1
 if [[ ! -z "$DO_DOT_NET" ]]; then
@@ -1025,6 +1055,7 @@ if [[ ! -z "$DO_DOT_NET" ]]; then
 	env WINEPREFIX=winedotnet winetricks dotnet461 corefonts
 fi
 
+#####################################################################
 #####################################################################
 ######### java
 # sudo update-alternatives --config java
@@ -1048,6 +1079,7 @@ if [[ ! -z "$DO_JAVA" ]]; then
 fi
 
 #####################################################################
+#####################################################################
 ######### MultiMC
 # https://multimc.org
 if [[ ! -z "$DO_MULTI_MC" ]]; then
@@ -1059,7 +1091,7 @@ if [[ ! -z "$DO_MULTI_MC" ]]; then
 	MULTIMC_REL='1.4-1'
 	MULTIMC_DEF="multimc_$MULTIMC_REL.deb"
 	MULTIMC_SRC='multimc_*.deb'
-	MULTIMC_DRV=$(download_driver $MULTIMC_URL $MULTIMC_URL/download/$MULTIMC_DEF $MULTIMC_SRC)
+	MULTIMC_DRV=$(downloadDriver $MULTIMC_URL $MULTIMC_URL/download/$MULTIMC_DEF $MULTIMC_SRC)
 
 	dpkg -i $MULTIMC_DRV
 fi
@@ -1068,6 +1100,7 @@ fi
 # Media
 #####################################################################
 
+#####################################################################
 #####################################################################
 ######### Discord
 # https://linuxconfig.org/how-to-install-discord-on-linux
@@ -1078,13 +1111,14 @@ if [[ ! -z "$DO_DISCORD" ]]; then
 	DISCORD_SRC='discord*.deb'
 	DISCORD_LST='discord-latest.deb'
 	echo "ownload_driver '' $DISCORD_URL $DISCORD_SRC"
-	DISCORD_DRV=$(download_driver '' $DISCORD_URL $DISCORD_SRC $DISCORD_LST)
+	DISCORD_DRV=$(downloadDriver '' $DISCORD_URL $DISCORD_SRC $DISCORD_LST)
 
 	apt install libgconf-2-4
 
 	dpkg -i $DISCORD_DRV
 fi
 
+#####################################################################
 #####################################################################
 ######### Dreambox Edit
 # https://blog.videgro.net/2013/10/running-dreamboxedit-at-linux/
@@ -1095,7 +1129,7 @@ if [[ ! -z "$DO_DREAMBOX_EDIT" ]]; then
 	DREAMBOX_REL='7.2.1.0'
 	DREAMBOX_DEF="dreamboxEDIT_without_setup_$DREAMBOX_REL.zip"
 	DREAMBOX_SRC='dreamboxEDIT_without_setup_*.zip'
-	DREAMBOX_DRV=$(download_driver $DREAMBOX_URL '' $DREAMBOX_SRC)
+	DREAMBOX_DRV=$(downloadDriver $DREAMBOX_URL '' $DREAMBOX_SRC)
 
 	echo $DREAMBOX_DRV
 	DREAMBOX_DIR=/opt/dreamboxedit
@@ -1113,58 +1147,60 @@ if [[ ! -z "$DO_DREAMBOX_EDIT" ]]; then
 fi
 
 #####################################################################
+#####################################################################
 ######### Firefox + Thunderbird
-
-function copy_profile() {
-	local profileZIP=$1
-	local profileLIN=$2
-	local profileWIN=$3
-	local profileOLD="$profileLIN/win10profile"
-	local profileINI="$profileLIN/profiles.ini"
-
-	if [[ -d "$profileOLD" ]]; then
-		echo 'windows profile already exist'
-		return
-	fi
-
-	sudo -u $SUDO_USER mkdir -p $profileOLD
-
-	if [[ -d "$profileWIN" ]]; then
-		local winProf=$(grep "StartWithLastProfile" $profileWIN/profiles.ini | cut -d '=' -f 2 | tr -d '\r')
-		local pathProf=$(grep -m${winProf:-1} -F '[Profile' $profileWIN/profiles.ini -A 3 | grep "Path" | cut -d '=' -f 2 | tr -d '\r')
-		if [[ -z "$pathProf" ]]; then
-			echo 'missing profile path entry'
-			return
-		fi
-		echo "cp -f -r $profileWIN/$pathProf/* $profileOLD"
-		sudo -u $SUDO_USER cp -f -r $profileWIN/$pathProf/* $profileOLD
-	elif [[ -f "$profileZIP" ]]; then
-		sudo -u $SUDO_USER unzip $profileZIP -d $pprofileOLD
-	else
-		echo 'missing copy of Windows profile'
-		return
-	fi
-
-	if [[ ! -f "$profileINI" ]]; then
-		cat <<- EOT | sudo -u $SUDO_USER tee $profileINI > /dev/null
-		[General]
-		StartWithLastProfile=0
-		Version=2
-		EOT
-	fi
-	sudo -u $SUDO_USER sed -i '0,/StartWithLastProfile=[0-9]*/s//StartWithLastProfile=0/' $profileINI
-	if ! grep -F -q 'win10profile' $profileINI ; then
-		cat <<- EOT | sudo -u $SUDO_USER tee -a $profileINI > /dev/null
-		[Profile1]
-		Name=win10profile
-		IsRelative=1
-		Path=win10profile
-		EOT
-	fi
-}
 
 if [[ ! -z "$DO_MOZILLA" ]]; then
 	echo '######### install Firefox + Thunderbird'
+
+	function mozillaCopyProfile() {
+		local profileZIP=$1
+		local profileLIN=$2
+		local profileWIN=$3
+		local profileOLD="$profileLIN/win10profile"
+		local profileINI="$profileLIN/profiles.ini"
+
+		if [[ -d "$profileOLD" ]]; then
+			echo 'windows profile already exist'
+			return
+		fi
+
+		sudo -u $SUDO_USER mkdir -p $profileOLD
+
+		if [[ -d "$profileWIN" ]]; then
+			local winProf=$(grep "StartWithLastProfile" $profileWIN/profiles.ini | cut -d '=' -f 2 | tr -d '\r')
+			local pathProf=$(grep -m${winProf:-1} -F '[Profile' $profileWIN/profiles.ini -A 3 | grep "Path" | cut -d '=' -f 2 | tr -d '\r')
+			if [[ -z "$pathProf" ]]; then
+				echo 'missing profile path entry'
+				return
+			fi
+			echo "cp -f -r $profileWIN/$pathProf/* $profileOLD"
+			sudo -u $SUDO_USER cp -f -r $profileWIN/$pathProf/* $profileOLD
+		elif [[ -f "$profileZIP" ]]; then
+			sudo -u $SUDO_USER unzip $profileZIP -d $pprofileOLD
+		else
+			echo 'missing copy of Windows profile'
+			return
+		fi
+
+		if [[ ! -f "$profileINI" ]]; then
+			cat <<- EOT | sudo -u $SUDO_USER tee $profileINI > /dev/null
+			[General]
+			StartWithLastProfile=0
+			Version=2
+			EOT
+		fi
+		sudo -u $SUDO_USER sed -i '0,/StartWithLastProfile=[0-9]*/s//StartWithLastProfile=0/' $profileINI
+		if ! grep -F -q 'win10profile' $profileINI ; then
+			cat <<- EOT | sudo -u $SUDO_USER tee -a $profileINI > /dev/null
+			[Profile1]
+			Name=win10profile
+			IsRelative=1
+			Path=win10profile
+			EOT
+		fi
+	}
+
 	apt remove --purge iceweasel
 
 	apt install -t unstable firefox
@@ -1176,10 +1212,11 @@ if [[ ! -z "$DO_MOZILLA" ]]; then
 	THUNDERBIRD_WINDOWS="/mnt/work_c/Users/$WINDOWS_USER/AppData/Roaming/Thunderbird"
 	THUNDERBIRD_LINUX="$HOME_USER/.thunderbird"
 
-	copy_profile 'Download/firefox.zip'     $FIREFOX_LINUX     $FIREFOX_WINDOWS
-	copy_profile 'Download/thunderbird.zip' $THUNDERBIRD_LINUX $THUNDERBIRD_WINDOWS
+	mozillaCopyProfile 'Download/firefox.zip'     $FIREFOX_LINUX     $FIREFOX_WINDOWS
+	mozillaCopyProfile 'Download/thunderbird.zip' $THUNDERBIRD_LINUX $THUNDERBIRD_WINDOWS
 fi
 
+#####################################################################
 #####################################################################
 ######### Spotify
 # https://wiki.debian.org/spotify
@@ -1198,6 +1235,7 @@ if [[ ! -z "$DO_SPOTIFY" ]]; then
 fi
 
 #####################################################################
+#####################################################################
 ######### twitch gui + VideoLan + Chatty
 # https://www.videolan.org
 # https://github.com/streamlink/streamlink-twitch-gui
@@ -1214,7 +1252,7 @@ if [[ ! -z "$DO_TWITCH_GUI" ]]; then
 	TWITCH_REL='v1.9.1'
 	TWITCH_DEF="streamlink-twitch-gui-${TWITCH_REL}-linux64.tar.gz"
 	TWITCH_SRC='streamlink-twitch-gui-*-linux64.tar.gz'
-	TWITCH_DRV=$(download_driver $TWITCH_URL $TWITCH_URL/download/$TWITCH_REL/$TWITCH_DEF $TWITCH_SRC)
+	TWITCH_DRV=$(downloadDriver $TWITCH_URL $TWITCH_URL/download/$TWITCH_REL/$TWITCH_DEF $TWITCH_SRC)
 
 	tar -xzvf $TWITCH_DRV -C /opt
 	apt install xdg-utils libgconf-2-4
@@ -1228,7 +1266,7 @@ if [[ ! -z "$DO_TWITCH_GUI" ]]; then
 	CHATTY_REL='0.11'
 	CHATTY_DEF="Chatty_$CHATTY_REL.zip"
 	CHATTY_SRC='Chatty_*.zip'
-	CHATTY_DRV=$(download_driver $CHATTY_URL $CHATTY_URL/download/v$CHATTY_REL/$CHATTY_DEF $CHATTY_SRC)
+	CHATTY_DRV=$(downloadDriver $CHATTY_URL $CHATTY_URL/download/v$CHATTY_REL/$CHATTY_DEF $CHATTY_SRC)
 
 	unzip $CHATTY_DRV -d /opt/chatty
 fi
@@ -1238,6 +1276,7 @@ fi
 #####################################################################
 
 #####################################################################
+#####################################################################
 ######### Atom
 # https://linuxhint.com/install_atom_text_editor_debian_10/
 if [[ ! -z "$DO_ATOM" ]]; then
@@ -1246,13 +1285,14 @@ if [[ ! -z "$DO_ATOM" ]]; then
 	ATOM_REL='v1.46.0'
 	ATOM_DEF='atom-amd64.deb'
 	ATOM_SRC='atom_*.deb'
-	ATOM_DRV=$(download_driver $ATOM_URL $ATOM_URL/download/$ATOM_REL/$ATOM_DEF $ATOM_SRC)
+	ATOM_DRV=$(downloadDriver $ATOM_URL $ATOM_URL/download/$ATOM_REL/$ATOM_DEF $ATOM_SRC)
 
 	dpkg -i $ATOM_DRV
 
 	atom --version
 fi
 
+#####################################################################
 #####################################################################
 ######### lightweight free system monitor
 # https://github.com/brndnmtthws/conky
@@ -1266,20 +1306,20 @@ if [[ ! -z "$DO_CONKY" ]]; then
 #  CONKY_REL='v2.4'
 #  CONKY_DEF='conky-manager-v2.4-amd64.deb'
 #  CONKY_SRC='conky-manager-*-amd64.deb'
-#  CONKY_DRV=$(download_driver $CONKY_URL $CONKY_URL/download/$CONKY_REL/$CONKY_DEF $CONKY_SRC)
+#  CONKY_DRV=$(downloadDriver $CONKY_URL $CONKY_URL/download/$CONKY_REL/$CONKY_DEF $CONKY_SRC)
 
 #  CONKY_FONT_URL=http://mxrepo.com/mx/repo/pool/main/m/mx-conky/
 #  CONKY_FONT_REL='20.4'
 #  CONKY_FONT_DEF='mx-conky_20.4_amd64.deb'
 #  CONKY_FONT_SRC='mx-conky_*_amd64.deb'
-#  CONKY_FONT_DRV=$(download_driver $CONKY_FONT_URL $CONKY_FONT_URL/$CONKY_FONT_DEF $CONKY_FONT_SRC)
+#  CONKY_FONT_DRV=$(downloadDriver $CONKY_FONT_URL $CONKY_FONT_URL/$CONKY_FONT_DEF $CONKY_FONT_SRC)
 #  dpkg -i $CONKY_FONT_DRV
 
 #  CONKY_URL=http://mxrepo.com/mx/repo/pool/main/c/conky-manager/
 #  CONKY_REL='2.7'
 #  CONKY_DEF='conky-manager_2.7+dfsg1-3mx19+2_amd64.deb'
 #  CONKY_SRC='conky-manager_*+dfsg1-3mx19+2_amd64.deb'
-#  CONKY_DRV=$(download_driver $CONKY_URL $CONKY_URL/$CONKY_DEF $CONKY_SRC)
+#  CONKY_DRV=$(downloadDriver $CONKY_URL $CONKY_URL/$CONKY_DEF $CONKY_SRC)
 #  dpkg -i $CONKY_DRV
 
 #  CONKY_BUILDS='http://ppa.launchpad.net/tomtomtom/conky-manager/ubuntu'
@@ -1295,6 +1335,7 @@ if [[ ! -z "$DO_CONKY" ]]; then
 fi
 
 #####################################################################
+#####################################################################
 ######### better text editor
 # https://www.sublimetext.com/
 if [[ ! -z "$DO_SUBLIME" ]]; then
@@ -1308,8 +1349,7 @@ if [[ ! -z "$DO_SUBLIME" ]]; then
 
 	ln -s /opt/sublime_text/sublime_text /usr/bin/sublime_text
 
-	DESKTOP_SUBLIME='Desktop/sublime.desktop'
-	cat <<- EOT | sudo -u $SUDO_USER tee $DESKTOP_SUBLIME > /dev/null
+	createDesktopEntry "sublime.desktop" <<- EOT
 	[Desktop Entry]
 	Version=1.0
 	Name=Sublime
@@ -1321,7 +1361,6 @@ if [[ ! -z "$DO_SUBLIME" ]]; then
 	Categories=Utility;Application;Editor;
 	StartupNotify=true
 	EOT
-	chmod +x $DESKTOP_SUBLIME
 
 	if [[ -d "Downloads/sublime/User" ]]; then
 		CONFIG_SUBLIME="~/.config/sublime-text-3/Packages/User/"
@@ -1331,6 +1370,7 @@ if [[ ! -z "$DO_SUBLIME" ]]; then
 fi
 
 #####################################################################
+#####################################################################
 ######### nice text editor
 # http://uvviewsoft.com/cudatext/
 if [[ ! -z "$DO_CUDA_TEXT" ]]; then
@@ -1338,13 +1378,12 @@ if [[ ! -z "$DO_CUDA_TEXT" ]]; then
 	CUDA_URL='https://www.fosshub.com/CudaText.html'
 	CUDA_DEF='cudatext_1.98.0.0-1_gtk2_amd64.deb'
 	CUDA_SRC='cudatext_*_gtk2_amd64.deb'
-	CUDA_DEB=$(download_driver $CUDA_URL '' $CUDA_SRC)
+	CUDA_DEB=$(downloadDriver $CUDA_URL '' $CUDA_SRC)
 
 	echo "execute 'sudo dpkg -i $CUDA_DEB'"
 	dpkg -i $CUDA_DEB
 
-	DESKTOP_CUDA='Desktop/cudatext.desktop'
-	cat <<- EOT | sudo -u $SUDO_USER tee $DESKTOP_CUDA > /dev/null
+	createDesktopEntry "cudatext.desktop" <<- EOT
 	[Desktop Entry]
 	Version=1.0
 	Name=Cuda Text
@@ -1356,7 +1395,6 @@ if [[ ! -z "$DO_CUDA_TEXT" ]]; then
 	Categories=Utility;Application;Editor;
 	StartupNotify=true
 	EOT
-	chmod +x $DESKTOP_CUDA
 
 	PHYLIB=$(find /usr -name 'libpython3.*so*' 2>/dev/null | head -1)
 
@@ -1392,6 +1430,7 @@ if [[ ! -z "$DO_CUDA_TEXT" ]]; then
 fi
 
 #####################################################################
+#####################################################################
 ######### nice icon sets
 # https://snwh.org/moka
 if [[ ! -z "$DO_MOKA" ]]; then
@@ -1407,6 +1446,7 @@ if [[ ! -z "$DO_MOKA" ]]; then
 fi
 
 #####################################################################
+#####################################################################
 ######### nice shell extension
 # https://ohmyz.sh
 if [[ ! -z "$DO_OHMYZ" ]]; then
@@ -1419,9 +1459,10 @@ if [[ ! -z "$DO_OHMYZ" ]]; then
 	sudo -u $SUDO_USER sed -i '0,/ZSH_THEME="[^"]*"/s//ZSH_THEME="robbyrussell"/' .zshrc     # ZSH_THEME="robbyrussell"
 	sudo -u $SUDO_USER sort .bash_history | uniq | awk '{print ": :0:;"$0}' >> .zsh_history
 
-	logout_now
+	logoutNow
 fi
 
+#####################################################################
 #####################################################################
 ######### Password Safe
 # https://howtoinstall.co/en/debian/stretch/passwordsafe-common
@@ -1432,40 +1473,42 @@ if [[ ! -z "$DO_PASSWORD_SAFE" ]]; then
 fi
 
 #####################################################################
+#####################################################################
 ######### Samba
 # https://devconnected.com/how-to-install-samba-on-debian-10-buster/
 
-SAMBA_CONF='/etc/samba/smb.conf'
-SAMBA_SHARE='/home/samba'
-
-function create_smb_user() {
-	local smbUser=$1
-	echo "create a samba user '$smbUser' with working directory at '$SAMBA_SHARE'"
-	useradd -M -d $SAMBA_SHARE/$smbUser -s /usr/sbin/nologin -G sambashare $smbUser
-	mkdir -p $SAMBA_SHARE/$smbUser
-	smbpasswd -a $smbUser
-	smbpasswd -e $smbUser
-	chown $smbUser:sambashare $SAMBA_SHARE/$smbUser
-	chmod 2770 $SAMBA_SHARE/smbadmin
-}
-
-function create_smb_user_config() {
-	local smbUser=$1
-	if ! grep -F -q "[$smbUser]" $SAMBA_CONF ; then
-		cat <<- 'EOT' >> $SAMBA_CONF
-		[$smbUser]
-		  path = $SAMBA_SHARE/$smbUser
-		  read only = no
-		  browseable = $2
-		  force create mode = 0660
-		  force directory mode = 2770
-		  valid users = @$smbUser @sambashare
-		EOT
-	fi
-}
-
 if [[ ! -z "$DO_SAMBA" ]]; then
 	echo '######### install Samba Server'
+
+	SAMBA_CONF='/etc/samba/smb.conf'
+	SAMBA_SHARE='/home/samba'
+
+	function sambaCreateSmbUser() {
+		local smbUser=$1
+		echo "create a samba user '$smbUser' with working directory at '$SAMBA_SHARE'"
+		useradd -M -d $SAMBA_SHARE/$smbUser -s /usr/sbin/nologin -G sambashare $smbUser
+		mkdir -p $SAMBA_SHARE/$smbUser
+		smbpasswd -a $smbUser
+		smbpasswd -e $smbUser
+		chown $smbUser:sambashare $SAMBA_SHARE/$smbUser
+		chmod 2770 $SAMBA_SHARE/smbadmin
+	}
+
+	function sambaCreateSmbUserConfig() {
+		local smbUser=$1
+		if ! grep -F -q "[$smbUser]" $SAMBA_CONF ; then
+			cat <<- 'EOT' >> $SAMBA_CONF
+			[$smbUser]
+			  path = $SAMBA_SHARE/$smbUser
+			  read only = no
+			  browseable = $2
+			  force create mode = 0660
+			  force directory mode = 2770
+			  valid users = @$smbUser @sambashare
+			EOT
+		fi
+	}
+
 	# groups: user sudo netdev cdrom
 	apt install samba
 #  apt install smbclient cifs-utils
@@ -1487,11 +1530,11 @@ if [[ ! -z "$DO_SAMBA" ]]; then
 		EOT
 	fi
 
-	create_smb_user $SUDO_USER
-	create_smb_user smbadmin
+	sambaCreateSmbUser $SUDO_USER
+	sambaCreateSmbUser smbadmin
 
-	create_smb_user_config $SUDO_USER no
-	create_smb_user_config smbadmin   yes
+	sambaCreateSmbUserConfig $SUDO_USER no
+	sambaCreateSmbUserConfig smbadmin   yes
 
 	nano $SAMBA_CONF
 
@@ -1514,21 +1557,29 @@ if [[ ! -z "$DO_SAMBA" ]]; then
 fi
 
 #####################################################################
+#####################################################################
 ######### Access Windows Share
 FSTAB='/etc/fstab'
 
 if [[ ! -z "$DO_CIFS" ]]; then
 	echo '######### install Access Windows Share'
+
+	echo "used windows domain: $WINDOWS_DOMAIN"
+	echo "used windows user: $WINDOWS_USER"
+	echo "default windows share names: work_c, work_d, work_e"
+	continueNow 'Do you want to use this values?'
+	echo
+
+	echo -n "type your windows password for $WINDOWS_USER:"
+	read -s WINDOWS_PW
+	echo
+
 	apt install cifs-utils
 
 	# my old windows disks
 	mkdir -p /mnt/work_c
 	mkdir -p /mnt/work_d
 	mkdir -p /mnt/work_e
-
-	echo -n "type your windows password for $SUDO_USER:"
-	read -s WINDOWS_PW
-	echo
 
 	WIN_CREDENTIALS='/etc/win-credentials'
 	cat <<- EOT > $WIN_CREDENTIALS
@@ -1567,28 +1618,26 @@ if [[ ! -z "$DO_CIFS" ]]; then
 	EOT
 	chmod +x $WIN_SHELL
 
-	DESKTOP_WIN='Desktop/windows.desktop'
-	cat <<- EOT | sudo -u $SUDO_USER tee "$DESKTOP_WIN" > /dev/null
+	createDesktopEntry "windows.desktop" <<- EOT
 	[Desktop Entry]
-	Name=$WINDOWS_DOMAIN
+	Name=Windows Shares
 	Comment=mount windows folder
 	Exec=bash -c "sudo $WIN_SHELL > /dev/null 2>&1 & xdg-open /mnt/work_c"
 	Icon=drive-removable-media
 	Terminal=false
 	Type=Application
-	Categories=Utility;Mount;
+	Categories=System;Utility;FileTools;FileManager;
 	StartupNotify=true
 	EOT
-	chmod +x $DESKTOP_WIN
 
-	SUDOERS_WIN=/etc/sudoers.d/win-cmds
-	echo "$SUDO_USER ALL= NOPASSWD: $WIN_SHELL" > $SUDOERS_WIN
-	chmod 0440 $SUDOERS_WIN
-	visudo -c
+	createSudoer "win-cmds" <<- EOT
+	$SUDO_USER ALL= NOPASSWD: $WIN_SHELL
+	EOT
 
 	df -h
 fi
 
+#####################################################################
 #####################################################################
 ######### XScreensaver
 if [[ ! -z "$DO_SCREENSAVER" ]]; then
@@ -1597,6 +1646,7 @@ if [[ ! -z "$DO_SCREENSAVER" ]]; then
 fi
 
 #####################################################################
+#####################################################################
 ######### GPicview image viewer
 if [[ ! -z "$DO_GPIC" ]]; then
 	echo '######### install GPicview'
@@ -1604,12 +1654,14 @@ if [[ ! -z "$DO_GPIC" ]]; then
 fi
 
 #####################################################################
+#####################################################################
 ######### Viewnior image viewer
 if [[ ! -z "$DO_VIEWNIOR" ]]; then
 	echo '######### install Viewnior'
 	apt install viewnior
 fi
 
+#####################################################################
 #####################################################################
 ######### rsync + rsnapshot
 # https://wiki.archlinux.de/title/Rsnapshot
@@ -1648,6 +1700,7 @@ if [[ ! -z "$DO_SNAPSHOT" ]]; then
 	echo "edit your '/etc/rsnapshot.conf'"
 fi
 
+#####################################################################
 #####################################################################
 if [[ ! -z "$DO_TEST" ]]; then
 	echo 'nothing here for now'
