@@ -122,7 +122,7 @@ while [[ $# -gt 0 ]]; do
 	shift
 done
 
-SOURCES_DIR=/etc/apt/sources.list.d
+ =/etc/apt/sources.list.d
 SUDO_USER=$(logname)
 HOME_USER=/home/$SUDO_USER
 cd $HOME_USER
@@ -299,6 +299,16 @@ function createSudoer() {
 	cat $@ > $sudoerFile
 	chmod 0440 $sudoerFile
 	visudo -c
+}
+
+function addPgpKey() {
+	if [[ -z "$2" ]]; then
+		wget -nv $1 -O - | apt-key add -
+	else
+#		wget -nv $1 -O - | apt-key --keyring /etc/apt/trusted.gpg.d/$2 add -
+		wget -nv $1 -O - | gpg --no-default-keyring --keyring /tmp/$2 --import
+		gpg --keyring /tmp/$2 --export > /etc/apt/trusted.gpg.d/$2
+	fi
 }
 
 #####################################################################
@@ -839,7 +849,7 @@ if [[ ! -z "$DO_VIRTUAL_BOX" ]]; then
 #  dpkg -i virtualbox-qt_6.1.0-dfsg-2_amd64.deb
 #  dpkg -i virtualbox-ext-pack_6.1.0-1_all.deb
 
-#  wget -nv https://www.virtualbox.org/download/oracle_vbox_2016.asc -O - | apt-key add -
+#  addPgpKey 'https://www.virtualbox.org/download/oracle_vbox_2016.asc' 'oracle.gpg'
 #  echo 'deb https://download.virtualbox.org/virtualbox/debian buster contrib' > $SOURCES_DIR/virtualbox.list
 #  apt update
 
@@ -921,7 +931,7 @@ if [[ ! -z "$DO_WINE" ]]; then
 	# not at latest debian testing
 	# repositories and images created with the Open Build Service
 	# OBS_URL='https://download.opensuse.org/repositories/Emulators:/Wine:/Debian/Debian_Testing_standard'
-	# wget -nv https://$OBS_URL/Release.key -O - | apt-key add -
+	# addPgpKey "https://$OBS_URL/Release.key" 'wine.gpg'
 	# echo 'deb http://$OBS_URL ./' > $SOURCES_DIR/wine-obs.list
 	# apt update
 
@@ -940,7 +950,7 @@ if [[ ! -z "$DO_WINE" ]]; then
 	# winehq-devel:     Developer builds are in-development, cutting edge versions.
 
 	WINE_BUILDS='https://dl.winehq.org/wine-builds'
-	wget -nv  $WINE_BUILDS/winehq.key -O - | apt-key add -
+	addPgpKey "$WINE_BUILDS/winehq.key" 'wineHQ.gpg'
 	echo "deb $WINE_BUILDS/debian/ bullseye main" > $SOURCES_DIR/wine.list
 	# echo "deb $WINE_BUILDS/debian/ testing  main" > $SOURCES_DIR/wine.list # <-- broken, not working
 	apt update
@@ -998,8 +1008,8 @@ fi
 if [[ ! -z "$DO_STEAM" ]]; then
 	echo '######### install Steam'
 	STEAM_BUILDS='https://repo.steampowered.com/steam'
-#  apt-key add --keyserver keyserver.ubuntu.com --recv-keys F24AEA9FB05498B7
-	wget -nv  $STEAM_BUILDS/archive/stable/steam.gpg -O - | apt-key add -
+#	addPgpKey "$STEAM_BUILDS/archive/stable/steam.gpg" 'steam.gpg'
+	addPgpKey "$STEAM_BUILDS/archive/precise/steam.gpg" 'steam.gpg'
 	cat <<- EOT > $SOURCES_DIR/steam.list
 	deb     [arch=amd64,i386] $STEAM_BUILDS stable steam
 	deb-src [arch=amd64,i386] $STEAM_BUILDS stable steam
@@ -1023,7 +1033,7 @@ fi
 if [[ ! -z "$DO_LUTRIS" ]]; then
 	echo '######### install Lutris'
 	LUTRIS_URL='https://download.opensuse.org/repositories/home:/strycore/Debian_Testing'
-	wget -nv $LUTRIS_URL/Release.key -O - | apt-key add -
+	addPgpKey "$LUTRIS_URL/Release.key" 'lutris.gpg'
 	echo "deb $LUTRIS_URL/ ./" > $SOURCES_DIR/lutris.list
 	apt update
 	apt install lutris
@@ -1068,7 +1078,7 @@ if [[ ! -z "$DO_JAVA" ]]; then
 	# apt install oracle-java8-installer
 
 	JFROG_BUILDS='https://adoptopenjdk.jfrog.io/adoptopenjdk'
-	wget -nv $JFROG_BUILDS/api/gpg/key/public -O - | apt-key add -
+	addPgpKey "$JFROG_BUILDS/api/gpg/key/public" 'jfrog.gpg'
 	echo "deb $JFROG_BUILDS/deb/ buster main" > $SOURCES_DIR/jfrog.list
 	apt update
 
@@ -1224,9 +1234,7 @@ fi
 if [[ ! -z "$DO_SPOTIFY" ]]; then
 	echo '######### install Spotify'
 
-#  apt-key adv --keyserver keyserver.ubuntu.com:80 --recv-keys 4773BD5E130D1D45
-#  apt-key adv --keyserver keyserver.ubuntu.com:80 --recv-keys 931FF8E79F0876134EDDBDCCA87FF9DF48BF1C90
-	wget -nv https://download.spotify.com/debian/pubkey.gpg -O - | apt-key add -
+	addPgpKey 'https://download.spotify.com/debian/pubkey.gpg' 'spotify.gpg'
 #	echo deb 'https://repository.spotify.com stable non-free' > $SOURCES_DIR/spotify.list
 	echo deb 'https://repository.scdn.co stable non-free' > $SOURCES_DIR/spotify.list
 	apt update
@@ -1341,7 +1349,7 @@ fi
 if [[ ! -z "$DO_SUBLIME" ]]; then
 	echo '######### install Sublime editor'
 
-	wget -nv https://download.sublimetext.com/sublimehq-pub.gpg -O - | apt-key add -
+	addPgpKey 'https://download.sublimetext.com/sublimehq-pub.gpg' 'sublime.gpg'
 	echo 'deb https://download.sublimetext.com/ apt/stable/' > $SOURCES_DIR/sublime.list
 	apt update
 
