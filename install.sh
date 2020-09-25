@@ -122,7 +122,7 @@ while [[ $# -gt 0 ]]; do
 	shift
 done
 
- =/etc/apt/sources.list.d
+SOURCES_DIR=/etc/apt/sources.list.d
 SUDO_USER=$(logname)
 HOME_USER=/home/$SUDO_USER
 cd $HOME_USER
@@ -435,6 +435,10 @@ if [[ ! -z "$DO_TOOLS" ]]; then
 		sudo -u $SUDO_USER mkdir -p $HOME_USER/.config/gtk-3.0
 		sudo -u $SUDO_USER cp Downloads/gtk.css $HOME_USER/.config/gtk-3.0/
 	fi
+
+	mkdir -p /opt/bin
+	addBinToPath '.bashrc' '/opt/bin'
+	addBinToPath '.zshrc'  '/opt/bin'
 fi
 
 #####################################################################
@@ -748,82 +752,117 @@ fi
 #####################################################################
 #####################################################################
 ######### KVM - install a image
+function isoInstallDebian() {
+	local debianImg='debian.qcow2'
+	local debianISO=$(ls -t $ISO_PATH/debian-$1*.iso 2>/dev/null | head -1)
+	if [[ ! -f "$debianISO" ]]; then
+		echo 'missing iso!'
+		exit 1
+	fi
+#	virsh vol-create-as default $debianImg 40G --format qcow2
+	virt-install \
+		--virt-type  kvm \
+		--name       $2 \
+		--ram        2048 \
+		--vcpus      2 \
+		--os-variant debian10 \
+		--hvm        \
+	  --rng        /dev/urandom \
+		--network    bridge=$1,model=virtio \
+		--graphics   spice \
+		--cdrom      $debianISO \
+		--disk       path=/var/lib/libvirt/images/$debianImg,size=40,bus=virtio,format=qcow2 \
+		--filesystem /share,/sharepoint,type=default,mode=mapped
+}
+
+function isoInstallCentos() {
+	local centImg='centos8.qcow2'
+	local centISO=$(ls -t $ISO_PATH/CentOS-$1*.iso 2>/dev/null | head -1)
+	if [[ ! -f "$centISO" ]]; then
+		echo 'missing iso!'
+		exit 1
+	fi
+#	virsh vol-create-as default $centImg 40G --format qcow2
+	virt-install \
+		--virt-type  kvm \
+		--name       centos$2 \
+		--ram        2048 \
+		--vcpus      2 \
+		--os-variant centos8 \
+		--hvm        \
+	  --rng        /dev/urandom \
+		--network    bridge=$1,model=virtio \
+		--graphics   spice \
+		--cdrom      $centISO \
+		--disk       path=/var/lib/libvirt/images/$centImg,size=40,bus=virtio,format=qcow2 \
+		--filesystem /share,/sharepoint,type=default,mode=mapped
+}
+
+function isoInstallWindows10() {
+	local win10Img='win10.qcow2'
+	local win10VFD=$(ls -t $ISO_PATH/virtio-win*.iso 2>/dev/null | head -1)
+	if [[ ! -f "$win10VFD" ]]; then
+		echo 'missing virtio-win!'
+		exit 1
+	fi
+	local win10ISO=$(ls -t $ISO_PATH/Win10*.iso 2>/dev/null | head -1)
+	if [[ ! -f "$win10ISO" ]]; then
+		echo 'missing iso!'
+		exit 1
+	fi
+#	virsh vol-create-as default $win10Img 80G --format qcow2
+	virt-install \
+		--virt-type  kvm \
+	  --name       win10 \
+	  --ram        8192 \
+	  --vcpus      4 \
+	  --os-variant win10 \
+		--hvm        \
+	  --rng        /dev/urandom \
+	  --network    bridge=$1,model=virtio \
+	  --graphics   spice \
+	  --disk       path=/var/lib/libvirt/images/$win10Img,size=30,bus=virtio,format=qcow2 \
+	  --disk       $win10ISO,device=cdrom,bus=sata \
+		--disk       $win10VFD,device=cdrom,bus=sata \
+	  --boot       hd,cdrom
+#		--filesystem /share,/sharepoint,type=default,mode=mapped \
+#		--cdrom      $win10ISO \
+#	  --cdrom      $win10VFD \
+}
+
+function isoInstallAndroid86() {
+	local androidImg='android9.img'
+	local androidISO=$(ls -t $ISO_PATH/android*.iso 2>/dev/null | head -1)
+	if [[ ! -f "$androidISO" ]]; then
+		echo 'missing iso!'
+		exit 1
+	fi
+	qemu-img create -f qcow2 $androidImg 2G
+	qemu-system-x86_64 \
+		-enable-kvm \
+		-m         2048 \
+		-smp       30 \
+		-cpu       host \
+		-boot      menu=on \
+		-device    virtio-mouse-pci \
+		-device    virtio-keyboard-pci \
+		-device    virtio-vga,virgl=on \
+		-display   gtk \
+		-soundhw   es1370 \
+		-net       nic \
+		-net       user \
+		-usb \
+		-usbdevice tablet \
+		-hda       $androidImg \
+		-cdrom     $androidISO
+}
+
 if [[ ! -z "$DO_ISO" ]]; then
 	echo '######### install a iso'
 
-	function isoInstallCentos() {
-		local centImg='centos8.qcow2'
-		local centOS=$(ls -t $ISO_PATH/CentOS-$1*.iso 2>/dev/null | head -1)
-		if [[ ! -f "$centOS" ]]; then
-			echo 'missing iso!'
-			exit 1
-		fi
-	#	virsh vol-create-as default $centImg 40G --format qcow2
-		virt-install \
-			--virt-type  kvm \
-			--name       centos$1 \
-			--ram        2048 \
-			--vcpus      2 \
-			--os-variant centos8 \
-			--hvm \
-			--network    bridge=$2,model=virtio \
-			--graphics   Spice \
-			--cdrom      $centOS \
-			--disk       path=/var/lib/libvirt/images/$centImg,size=40,bus=virtio,format=qcow2
-	#		--disk       vol=default/$centImg,bus=virtio,format=qcow2
-	}
-
-	function isoInstallDebian() {
-		local debianImg='debian.qcow2'
-		local debianOS=$(ls -t $ISO_PATH/debian-$1*.iso 2>/dev/null | head -1)
-		if [[ ! -f "$debianOS" ]]; then
-			echo 'missing iso!'
-			exit 1
-		fi
-	#	virsh vol-create-as default $debianImg 40G --format qcow2
-		virt-install \
-			--virt-type  kvm \
-			--name       $1 \
-			--ram        2048 \
-			--vcpus      2 \
-			--os-variant debian10 \
-			--hvm \
-			--network    bridge=$2,model=virtio \
-			--graphics   spice \
-			--cdrom      $debianOS \
-			--disk       path=/var/lib/libvirt/images/$debianImg,size=40,bus=virtio,format=qcow2
-	#		--disk       vol=default/$debianImg,bus=virtio,format=qcow2
-	}
-
-	function isoInstallAndroid86() {
-		local androidImg='android9.img'
-		local androidOS=$(ls -t $ISO_PATH/android*.iso 2>/dev/null | head -1)
-		if [[ ! -f "$androidOS" ]]; then
-			echo 'missing iso!'
-			exit 1
-		fi
-		qemu-img create -f qcow2 $androidImg 2G
-		qemu-system-x86_64 \
-			-enable-kvm \
-			-m         2048 \
-			-smp       30 \
-			-cpu       host \
-			-boot      menu=on \
-			-device    virtio-mouse-pci \
-			-device    virtio-keyboard-pci \
-			-device    virtio-vga,virgl=on \
-			-display   gtk \
-			-soundhw   es1370 \
-			-net       nic \
-			-net       user \
-			-usb \
-			-usbdevice tablet \
-			-hda       $androidImg \
-			-cdrom     $androidOS
-	}
-
-#	isoInstallCentos 8 $BRIDGE
-	isoInstallDebian bullseye $BRIDGE
+	isoInstallDebian    $BRIDGE bullseye
+#	isoInstallCentos    $BRIDGE 8
+#	isoInstallWindows10 $BRIDGE
 fi
 
 #####################################################################
@@ -1712,6 +1751,8 @@ fi
 #####################################################################
 if [[ ! -z "$DO_TEST" ]]; then
 	echo 'nothing here for now'
+
+# isoInstallWindows10 $BRIDGE
 
 #	RC_LOCAL='/etc/rc.d/rc.local'
 #	TEST_FILE='/opt/scripts/run-script-on-boot.sh'
