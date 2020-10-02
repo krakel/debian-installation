@@ -1121,10 +1121,10 @@ if [[ ! -z "$DO_JAVA" ]]; then
 	echo "deb $JFROG_BUILDS/deb/ buster main" > $SOURCES_DIR/jfrog.list
 	apt update
 
-	JAVA_VERSION=14
-	apt install "adoptopenjdk-${JAVA_VERSION}-hotspot"
-#  apt install "adoptopenjdk-${JAVA_VERSION}-hotspot-jre"
-#  apt install" adoptopenjdk-${JAVA_VERSION}-openj9-jre"
+	apt install "adoptopenjdk-14-hotspot"
+	apt install "adoptopenjdk-8-hotspot"
+#  apt install "adoptopenjdk-8-hotspot-jre"
+#  apt install" adoptopenjdk-8-openj9-jre"
 fi
 
 #####################################################################
@@ -1720,7 +1720,7 @@ if [[ ! -z "$DO_SNAPSHOT" ]]; then
 	apt install autofs
 
 	AUTO_TYPE=usb
-	AUTO_DIR=/var/autofs/$AUTO_TYPE
+	AUTO_DIR=/mnt/autofs/$AUTO_TYPE
 	AUTO_CONF=/etc/auto.$AUTO_TYPE
 	AUTO_MASTER='/etc/auto.master'
 
