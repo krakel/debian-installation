@@ -7,65 +7,67 @@
 # lvm VG root vg
 
 function helpMsg() {
-	echo 'Usage:'
-	echo 'install su'
-	echo 'sudo install [commands]*'
-	echo
-	echo 'Sudo:     !!! run without sudo'
-	echo 'su        only add user to sudo group'
-	echo
-	echo 'Commands:'
-	echo 'help      this help'
-	echo 'test      only script tests'
-	echo
-	echo 'src       debian testing (use this first)'
-	echo 'visudo    some sudo cmd definitions'
-	echo 'amd       amd/ati driver         (1 reboot)'
-	echo 'nvidia    nvidia driver          (1 reboot)'
-	echo 'nvidia2   nvidia driver official (1 reboot, 2 runs)'
-	echo
-	echo 'cifs      Access Windows Share'
-	echo 'conky     lightweight free system monitor'
-	echo 'ohmyz     ohmyz shell extension'
-	echo 'samba     Samba Server, access from Windows (not used, I use only cifs)'
-	echo 'snap      rsnapshot+rsync backups on local system'
-	echo 'tools     xfce tools'
-	echo
-	echo 'kvm       KVM, QEMU with Virt-Manager (1 reboot)'
-	echo 'iso       install a iso'
-	echo 'virtual   VirtualBox with SID library (removed from debian testing)'
-	echo 'anbox     Anbox, a Android Emulator (very alpha)'
-	echo
-	echo 'wine      Wine'
-	echo 'steam     Steam'
-	echo 'lutris    Lutris'
-	echo 'dxvk      vulkan-based compatibility layer for Direct3D'
-	echo 'dnet      Microsoft .Net 4.6.1 (do not use)'
-	echo 'java      java 8+11 jdk'
-	echo 'multimc   Minecraft MultiMC'
-	echo
-	echo 'discord   Discord'
-	echo 'dream     Dreambox Edit'
-	echo 'mozilla   Firefox + Thunderbird'
-	echo 'spotify   Spotify, some music'
-	echo 'twitch    twitch gui + VideoLan + Chatty'
-	echo
-	echo 'atom      Atom IDE'
-	echo 'cuda      CudaText editor (little bit unusable)'
-	echo 'sub       Sublime editor (better, need license)'
-	echo
-	echo 'gpic      GPicview image viewer'
-	echo 'viewnior  Viewnior image viewer'
-	echo
-	echo 'login     Autologin'
-	echo 'moka      nice icon set'
-	echo 'pwsafe    Password Safe'
-	echo 'screen    XScreensaver'
+  echo 'Usage:
+  install su
+  sudo install [commands]*
+
+Sudo:       !!! run without sudo
+  su        only add user to sudo group
+
+Commands:
+  help      this help
+  test      only script tests
+
+  src       debian testing (use this first)
+  amd       amd/ati driver         (1 reboot)
+  nvidia    nvidia driver          (1 reboot)
+  nvidia2   nvidia driver official (1 reboot, 2 runs)
+  visudo    some sudo cmd definitions
+
+  agent     autostart ssh-agent
+  cifs      Access Windows Share
+  conky     lightweight free system monitor
+  ohmyz     ohmyz shell extension
+  samba     Samba Server, access from Windows (not used, I use only cifs)
+  snap      rsnapshot+rsync backups on local system
+  tools     xfce tools
+
+  kvm       KVM, QEMU with Virt-Manager (1 reboot)
+  iso       install a iso
+  virtual   VirtualBox with SID library (removed from debian testing)
+  anbox     Anbox, a Android Emulator (very alpha)
+
+  wine      Wine
+  steam     Steam
+  lutris    Lutris
+  dxvk      vulkan-based compatibility layer for Direct3D
+  dnet      Microsoft .Net 4.6.1 (do not use)
+  java      java 8+14 jdk
+  multimc   Minecraft MultiMC
+
+  discord   Discord
+  dream     Dreambox Edit
+  mozilla   Firefox + Thunderbird
+  spotify   Spotify, some music
+  twitch    twitch gui + VideoLan + Chatty
+
+  atom      Atom IDE
+  cuda      CudaText editor (little bit unusable)
+  sub       Sublime editor (better, need license)
+
+  gpic      GPicview image viewer
+  viewnior  Viewnior image viewer
+
+  login     Autologin
+  moka      nice icon set
+  pwsafe    Password Safe
+  screen    XScreensaver'
 }
 
 declare -A SELECT=(
-	[anbox]=DO_ANBOX
+	[agent]=DO_SSH_AGENT
 	[amd]=DO_AMD
+	[anbox]=DO_ANBOX
 	[atom]=DO_ATOM
 	[cifs]=DO_CIFS
 	[conky]=DO_CONKY
@@ -89,10 +91,10 @@ declare -A SELECT=(
 	[pwsafe]=DO_PASSWORD_SAFE
 	[samba]=DO_SAMBA
 	[screen]=DO_SCREENSAVER
+	[snap]=DO_SNAPSHOT
 	[spotify]=DO_SPOTIFY
 	[src]=DO_SOURCE
 	[steam]=DO_STEAM
-	[snap]=DO_SNAPSHOT
 	[su]=ONLY_SUDOER
 	[sub]=DO_SUBLIME
 	[test]=DO_TEST
@@ -312,6 +314,11 @@ function addPgpKey() {
 }
 
 #####################################################################
+# System
+#####################################################################
+
+#####################################################################
+#####################################################################
 if [[ ! -z "$DO_SOURCE" ]]; then
 	SOURCES='/etc/apt/sources.list'
 	ORIGINAL='/etc/apt/sources.orig'
@@ -375,12 +382,10 @@ if [[ ! -z "$DO_SOURCE" ]]; then
 	dpkg --add-architecture i386
 	apt update
 
-	# TARGET_BACKPORT="-t testing-backports"
-
 	apt install net-tools
 	apt install apt-transport-https
 	apt install firmware-linux-nonfree
-	apt install $TARGET_BACKPORT linux-headers-$(uname -r | sed 's/[^-]*-[^-]*-//')
+	apt install linux-headers-$(uname -r | sed 's/[^-]*-[^-]*-//')
 	apt install build-essential
 	# apt install dkms  # conflict kernel 5.7 with official nvidia driver
 	apt autoremove
@@ -569,6 +574,58 @@ if [[ ! -z "$DO_AUTO_LOGIN" ]]; then
 fi
 
 #####################################################################
+#####################################################################
+if [[ ! -z "$DO_SSH_AGENT" ]]; then
+
+	function addSSHAgent() {
+		if ! grep -F -q 'start_agent()' $1 ; then
+			cat <<- 'EOT' | sudo -u $SUDO_USER tee -a $1 > /dev/null
+
+			SSH_ENV=$HOME/.ssh/environment
+
+			function start_agent() {
+			  echo "Initializing new SSH agent ..."
+			  bash -c ssh-agent -c | sed 's/^echo/#echo/' > $SSH_ENV
+			  echo "succeeded"
+			  chmod 600 $SSH_ENV
+			  . $SSH_ENV > /dev/null
+			  ssh-add $HOME/.ssh/id_rsa
+			  ssh-add $HOME/.ssh/git_rsa
+			}
+
+			function test_identities() {
+			  if ssh-add -l | grep "The agent has no identities" > /dev/null; then
+			    if ! ssh-add; then
+			      start_agent
+			    fi
+			  fi
+			}
+
+			if [ -n "$SSH_AGENT_PID" ]; then
+			  if ps -ef | grep $SSH_AGENT_PID | grep ssh-agent > /dev/null; then
+			    test_identities
+			  fi
+			else
+			  if [ -f $SSH_ENV ]; then
+			    . $SSH_ENV > /dev/null
+			  fi
+			  if ps -ef | grep $SSH_AGENT_PID | grep -v grep | grep ssh-agent > /dev/null; then
+			    test_identities
+			  else
+			    start_agent
+			  fi
+			fi
+			EOT
+		fi
+	}
+
+	addSSHAgent '.bashrc'
+	addSSHAgent '.zshrc'
+
+	logoutNow
+fi
+
+#####################################################################
 # Virtualization
 #####################################################################
 
@@ -604,10 +661,6 @@ if [[ ! -z "$DO_KVM" ]]; then
 		local thePort=$2
 
 		cat <<- 'EOT' > "/etc/network/interfaces.d/$theBridge"
-		# The loopback network interface
-		auto lo
-		iface lo inet loopback
-
 		# The primary network interface
 		auto $thePort
 		iface $thePort inet manual
