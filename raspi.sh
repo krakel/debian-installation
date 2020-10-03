@@ -200,13 +200,11 @@ function addPgpKey() {
 #####################################################################
 #####################################################################
 if [[ ! -z "$DO_SOURCE" ]]; then
-	dpkg --add-architecture i386
 	apt update
 	apt full-upgrade
 
 	apt install net-tools
 	apt install apt-transport-https
-	apt install linux-headers-$(uname -r | sed 's/[^-]*-[^-]*-//')
 	apt install wget
 	apt autoremove
 
@@ -254,9 +252,6 @@ if [[ ! -z "$DO_FLASH" ]]; then
 	vcgencmd bootloader_config
 	echo
 
-#	https://www.raspberrypi.org/forums/viewforum.php?f=29&269769
-#	rpi-update
-
 	ls -al $BOOT_LDR
 
 	BOOT_DRV=$(ls -t "$BOOT_LDR/pieeprom*.bin" 2>/dev/null | head -1)
@@ -265,6 +260,9 @@ if [[ ! -z "$DO_FLASH" ]]; then
 		rpi-eeprom-update -d -f "$BOOT_DRV"
 		rebootNow
 	fi
+
+#	https://www.raspberrypi.org/forums/viewforum.php?f=29&269769
+#	rpi-update
 fi
 
 #####################################################################
@@ -316,39 +314,57 @@ if [[ ! -z "$DO_SSH" ]]; then
 
 	ClientAliveCountMax 3
 	ClientAliveInterval 3600
-	MaxStartups 3:50:10
+	MaxAuthTries 3
+	MaxStartups 3:50:6
 	PrintLastLog yes
 	PrintMotd no
 	TCPKeepAlive yes
 	X11Forwarding no
+	X11DisplayOffset 10
 
 	#Banner /etc/issue.net
 	AcceptEnv LANG LC_*
 	Subsystem sftp /usr/lib/ssh/sftp-server -f AUTHPRIV -l INFO
-	UsePAM no
+	UsePAM yes
 
 	AllowGroups ssh
 	AllowUsers $SUDO_USER
 	Compression delayed
 
-	Ciphers chacha20-poly1305@openssh.com,aes256-gcm@openssh.com,aes128-gcm@openssh.com,aes256-ctr,aes192-ctr,aes128-ctr
-
+	Ciphers chacha20-poly1305@openssh.com,aes256-gcm@openssh.com,aes128-gcm@openssh.com,aes256-ctr
 	HostKeyAlgorithms rsa-sha2-512,ssh-rsa,ssh-dss
-
 	KexAlgorithms curve25519-sha256@libssh.org,diffie-hellman-group-exchange-sha256
-
-	MACs hmac-sha2-512-etm@openssh.com,hmac-sha2-256-etm@openssh.com,umac-128-etm@openssh.com,hmac-sha2-512,hmac-sha2-256,hmac-ripemd160
+	MACs hmac-sha2-512-etm@openssh.com,hmac-sha2-256-etm@openssh.com,hmac-sha2-512,hmac-sha2-256,umac-128-etm@openssh.com
 	EOT
 
-	F2B_CONF=/etc/fail2ban/jail.local
-	apt install fail2ban
-	cp /etc/fail2ban/jail.conf $F2B_CONF
-	sed -i "s/^.?ignoreip.*/ignoreip 127.0.0.1/32 192.168.0.16/28" $F2B_CONF
-	systemctl restart fail2ban
+	#F2B_CONF=/etc/fail2ban/jail.local
+	#apt install fail2ban
+	#cp /etc/fail2ban/jail.conf $F2B_CONF
+	#sed -i "s/^.?ignoreip.*/ignoreip 127.0.0.1/32 192.168.0.16/28" $F2B_CONF
+	#systemctl restart fail2ban
 
-	ufw status numbered
-	ufw allow $SSH_PORT
-	ufw enable
+	#ufw status numbered
+	#ufw allow $SSH_PORT
+	#ufw enable
+
+	#iptables
+	iptables -A INPUT -p tcp -m tcp --dport 22 -m state --state NEW -m recent --set --name SSH --mask 255.255.255.255 --rsource
+	iptables -A INPUT -p tcp -m tcp --dport 22 -m state --state NEW -m recent --update --seconds 600 --hitcount 5 --rttl --name SSH --mask 255.255.255.255 --rsource -j DROP
+	iptables -A INPUT -p tcp -m tcp --dport 22 -j ACCEPT
+	iptables -A INPUT -s 101.251.197.238/32 -p tcp -m tcp --dport 22 -j REJECT --reject-with icmp-host-prohibited
+	iptables -A INPUT -s 118.0.0.0/8        -p tcp -m tcp --dport 22 -j REJECT --reject-with icmp-host-prohibited
+	iptables -A INPUT -s 119.0.0.0/9        -p tcp -m tcp --dport 22 -j REJECT --reject-with icmp-host-prohibited
+
+	RULES_DST="/etc/iptables.rules"
+	RULES_BIN="/etc/network/if-pre-up.d/network.sh"
+	iptables-save > $RULES_DST
+
+	cat <<- EOT > $RULES_BIN
+	#!/bin/sh
+	/sbin/iptables-restore < $RULES_DST
+	EOT
+
+	chmod +x $RULES_BIN
 fi
 
 #####################################################################
@@ -403,11 +419,12 @@ if [[ ! -z "$DO_BIND" ]]; then
 	fi
 	echo "$RASP_NAME" > /etc/hostname
 
-	#systemctl restart hostname
-	/etc/init.d/hostname.sh restart		# old !!!
+	systemctl restart systemd-hostnamed
+	#/etc/init.d/hostname.sh restart		# old !!!
 
-	# edit /etc/hosts
-	# add 127.0.0.1 $RASP_NAME.local $RASP_NAME
+	if ! grep -F -q "$RASP_NAME.local" /etc/hosts ; then
+		echo "127.0.0.1 $RASP_NAME.local $RASP_NAME" >> /etc/hosts
+	fi
 
 	if [[ ! -f "/etc/host.conf.old" ]];
 		mv "/etc/host.conf" "/etc/host.conf.old"
@@ -421,14 +438,41 @@ if [[ ! -z "$DO_BIND" ]]; then
 	mkdir -p /var/cache/bind
 	mkdir -p /var/log/named
 
-	# edit /etc/bind/named.conf.options
-	# enable forwarders
+	# 217.0.43.161
+	# 217.0.43.177
+	cat <<- 'EOT' >> '/etc/bind/named.conf.options'
+	options {
+	  directory "/var/cache/bind";
+	  recursion yes;
+	  allow-query { "acl_trusted_clients"; };
+	  forwarders {
+	    46.182.19.48;
+	    84.200.69.80;
+	    217.237.150.205;
+	  };
+	  dnssec-validation auto;
+	  auth-nxdomain no;    # conform to RFC1035
+	  listen-on-v6 { any; };
+	};
+
+	acl "acl_trusted_transfer" {
+	  none;
+	};
+
+	acl "acl_trusted_clients" {
+	  // localhost (RFC 3330) - Loopback-Device addresses
+	  127.0.0.0/8;    // 127.0.0.0 - 127.255.255.255
+
+	  // Private Network (RFC 1918) - LAN, WLAN etc.
+	  192.168.0.0/24; // 192.168.0.0 - 192.168.0.255
+	};
+	EOT
 
 	cat <<- 'EOT' >> '/etc/bind/named.conf.local'
-
 	zone "local" {
 	  type master;
 	  file "/etc/bind/db.raspi";
+	  allow-transfer { acl_trusted_transfer; };
 	};
 
 	zone "0.168.192.in-addr.arpa" {
@@ -519,13 +563,13 @@ if [[ ! -z "$DO_MARIA" ]]; then
 		rebootNow
 	fi
 
-	echo "You neew a phpmyadmin password!"
+	echo "You need a phpmyadmin password!"
 	continueNow
 
 	apt install phpmyadmin
 
-	echo "you neew your root password"
-	echo "Change the roor password?              -> no"
+	echo "you need your root password"
+	echo "Change the root password?              -> no"
 	echo "Remove anonymous user?                 -> yes"
 	echo "Disallow root login remotely?          -> yes"
 	echo "Remove test database and access to it? -> no"
@@ -566,7 +610,6 @@ if [[ ! -z "$DO_NEXT_CLOUD" ]]; then
 	sudo -u $SUDO_USER unzip Downloads/latest.zip -d $HOME_USER/nextcloud
 	mv $HOME_USER/nextcloud $WWW_DIR
 	chown -R www-data:www-data $WWW_DIR/nextcloud
-
 fi
 
 #####################################################################
