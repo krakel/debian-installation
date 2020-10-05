@@ -130,7 +130,7 @@ HOME_USER=/home/$SUDO_USER
 cd $HOME_USER
 
 # I use the same name
-WINDOWS_USER=$SUDO_USER     # change this to your windows user name
+WINDOWS_USER=$SUDO_USER       # change this to your windows user name
 WINDOWS_DOMAIN='work.local'	# change this to your windows domain
 
 # apt update      # refreshes repository index
@@ -212,16 +212,16 @@ function insertPathFkts() {
 	fi
 }
 
-# addBinToPath file path
+# addBinToPath file path <after>
 function addBinToPath() {
 	insertPathFkts $1
-	local addPathStr="path_add \"$2\""
+	local addPathStr="path_add '$2'"
 
 	if ! grep -F -q "$addPathStr" $1 ; then
 		echo "add '$2' to '$1'"
 		cat <<- EOT | sudo -u $SUDO_USER tee -a $1 > /dev/null
 
-		$addPathStr after
+		$addPathStr $3
 		export PATH
 		EOT
 	else
@@ -243,6 +243,17 @@ function addExportEnv() {
 	else
 		echo "'$1' already contain '$exportStr'!"
 	fi
+}
+
+function addSudoComplete() {
+	if ! grep -F -q 'complete -cf sudo' $1 ; then
+		cat <<- 'EOT' | sudo -u $SUDO_USER tee -a $1 > /dev/null
+		if [ "$PS1" ]; then
+		  complete -cf sudo
+		fi
+		EOT
+	fi
+
 }
 
 # installLib lib-name
@@ -442,8 +453,12 @@ if [[ ! -z "$DO_TOOLS" ]]; then
 	fi
 
 	mkdir -p /opt/bin
-	addBinToPath '.bashrc' '/opt/bin'
-	addBinToPath '.zshrc'  '/opt/bin'
+	addBinToPath '.profile' '/opt/bin' after
+	addBinToPath '.profile' "$HOME_USER/bin"
+	addBinToPath '.profile' "$HOME_USER/.local/bin"
+	addSudoComplete '.profile'
+
+	#sudo -u $SUDO_USER echo 'source ~/.profile' >> .bashrc # already read by bash
 fi
 
 #####################################################################
@@ -619,8 +634,7 @@ if [[ ! -z "$DO_SSH_AGENT" ]]; then
 		fi
 	}
 
-	addSSHAgent '.bashrc'
-	addSSHAgent '.zshrc'
+	addSSHAgent '.profile'
 
 	logoutNow
 fi
@@ -796,8 +810,7 @@ if [[ ! -z "$DO_KVM" ]]; then
 	kvmActivateBridge $BRIDGE
 	# ip a s $BRIDGE
 
-	addExportEnv '.bashrc' 'LIBVIRT_DEFAULT_URI' 'qemu:///system'
-	addExportEnv '.zshrc'  'LIBVIRT_DEFAULT_URI' 'qemu:///system'
+	addExportEnv '.profile' 'LIBVIRT_DEFAULT_URI' 'qemu:///system'
 
 	rebootNow
 fi
@@ -805,6 +818,8 @@ fi
 #####################################################################
 #####################################################################
 ######### KVM - install a image
+LIBVIRT_IMG='/var/lib/libvirt/images'
+
 function isoInstallDebian() {
 	local debianImg='debian.qcow2'
 	local debianISO=$(ls -t $ISO_PATH/debian-$1*.iso 2>/dev/null | head -1)
@@ -814,18 +829,18 @@ function isoInstallDebian() {
 	fi
 #	virsh vol-create-as default $debianImg 40G --format qcow2
 	virt-install \
-		--virt-type  kvm \
-		--name       $2 \
-		--ram        2048 \
-		--vcpus      2 \
-		--os-variant debian10 \
-		--hvm        \
+	  --virt-type  kvm \
+	  --name       $2 \
+	  --ram        2048 \
+	  --vcpus      2 \
+	  --os-variant debian10 \
+	  --hvm        \
 	  --rng        /dev/urandom \
-		--network    bridge=$1,model=virtio \
-		--graphics   spice \
-		--cdrom      $debianISO \
-		--disk       path=/var/lib/libvirt/images/$debianImg,size=40,bus=virtio,format=qcow2 \
-		--filesystem /share,/sharepoint,type=default,mode=mapped
+	  --network    bridge=$1,model=virtio \
+	  --graphics   spice \
+	  --cdrom      $debianISO \
+	  --disk       path=$LIBVIRT_IMG/$debianImg,size=40,bus=virtio,format=qcow2 \
+	  --filesystem /share,/sharepoint,type=default,mode=mapped
 }
 
 function isoInstallCentos() {
@@ -837,18 +852,18 @@ function isoInstallCentos() {
 	fi
 #	virsh vol-create-as default $centImg 40G --format qcow2
 	virt-install \
-		--virt-type  kvm \
-		--name       centos$2 \
-		--ram        2048 \
-		--vcpus      2 \
-		--os-variant centos8 \
-		--hvm        \
+	  --virt-type  kvm \
+	  --name       centos$2 \
+	  --ram        2048 \
+	  --vcpus      2 \
+	  --os-variant centos8 \
+	  --hvm        \
 	  --rng        /dev/urandom \
-		--network    bridge=$1,model=virtio \
-		--graphics   spice \
-		--cdrom      $centISO \
-		--disk       path=/var/lib/libvirt/images/$centImg,size=40,bus=virtio,format=qcow2 \
-		--filesystem /share,/sharepoint,type=default,mode=mapped
+	  --network    bridge=$1,model=virtio \
+	  --graphics   spice \
+	  --cdrom      $centISO \
+	  --disk       path=$LIBVIRT_IMG/$centImg,size=40,bus=virtio,format=qcow2 \
+	  --filesystem /share,/sharepoint,type=default,mode=mapped
 }
 
 function isoInstallWindows10() {
@@ -865,21 +880,21 @@ function isoInstallWindows10() {
 	fi
 #	virsh vol-create-as default $win10Img 80G --format qcow2
 	virt-install \
-		--virt-type  kvm \
+	  --virt-type  kvm \
 	  --name       win10 \
 	  --ram        8192 \
 	  --vcpus      4 \
 	  --os-variant win10 \
-		--hvm        \
+	  --hvm        \
 	  --rng        /dev/urandom \
 	  --network    bridge=$1,model=virtio \
 	  --graphics   spice \
-	  --disk       path=/var/lib/libvirt/images/$win10Img,size=30,bus=virtio,format=qcow2 \
+	  --disk       path=$LIBVIRT_IMG/$win10Img,size=30,bus=virtio,format=qcow2 \
 	  --disk       $win10ISO,device=cdrom,bus=sata \
-		--disk       $win10VFD,device=cdrom,bus=sata \
+	  --disk       $win10VFD,device=cdrom,bus=sata \
 	  --boot       hd,cdrom
-#		--filesystem /share,/sharepoint,type=default,mode=mapped \
-#		--cdrom      $win10ISO \
+#	  --filesystem /share,/sharepoint,type=default,mode=mapped \
+#	  --cdrom      $win10ISO \
 #	  --cdrom      $win10VFD \
 }
 
@@ -890,24 +905,57 @@ function isoInstallAndroid86() {
 		echo 'missing iso!'
 		exit 1
 	fi
+	#virsh vol-create-as default $androidImg 2G --format qcow2
+	#virt-install \
+	#  --virt-type  kvm \
+	#  --name       android \
+	#  --ram        2048 \
+	#  --vcpus      2 \
+	#  --cpu        host \
+	#  --os-variant android-x86-9.0 \
+	#  --hvm        \
+	#  --rng        /dev/urandom \
+	#  --network    bridge=$1,model=virtio \
+	#  --graphics   spice \
+	#  --sound      es1370 \
+	#  --cdrom      $androidISO  \
+	#  --disk       path=$LIBVIRT_IMG/$androidImg,size=30,bus=virtio,format=qcow2 \
+	#  --boot       hd,cdrom,bootmenu.enable=on
 	qemu-img create -f qcow2 $androidImg 2G
 	qemu-system-x86_64 \
-		-enable-kvm \
-		-m         2048 \
-		-smp       30 \
-		-cpu       host \
-		-boot      menu=on \
-		-device    virtio-mouse-pci \
-		-device    virtio-keyboard-pci \
-		-device    virtio-vga,virgl=on \
-		-display   gtk \
-		-soundhw   es1370 \
-		-net       nic \
-		-net       user \
-		-usb \
-		-usbdevice tablet \
-		-hda       $androidImg \
-		-cdrom     $androidISO
+	  -enable-kvm \
+	  -m          2048 \
+	  -smp        30 \
+	  -cpu        host \
+	  -boot       menu=on \
+	  -device     virtio-mouse-pci \
+	  -device     virtio-keyboard-pci \
+	  -device     virtio-vga,virgl=on \
+	  -display    gtk \
+	  -soundhw    es1370 \
+	  -net        nic \
+	  -net        user \
+	  -usb        \
+	  -usbdevice  tablet \
+	  -hda        $androidImg \
+	  -cdrom      $androidISO
+}
+
+function isoImportVirtualBox() {
+	local old=$1
+	local new=$2
+
+	vboxmanage list hdds
+	vboxmanage clonehd $old.vdi $new.img --format raw
+
+# windows
+#	"C:\Program Files\Oracle\VBoxManage.exe" list hdds
+#	"C:\Program Files\Oracle\VBoxManage.exe" clonemedium "$old.vdi" "$new.img" --format raw
+
+	qemu-img convert -f raw $new.img -O qcow2 $LIBVIRT_IMG/$new.qcow2
+
+	chown root:root $LIBVIRT_IMG/$new.qcow2
+	chmod 600       $LIBVIRT_IMG/$new.qcow2
 }
 
 if [[ ! -z "$DO_ISO" ]]; then
@@ -916,6 +964,8 @@ if [[ ! -z "$DO_ISO" ]]; then
 	isoInstallDebian    $BRIDGE bullseye
 #	isoInstallCentos    $BRIDGE 8
 #	isoInstallWindows10 $BRIDGE
+#	isoInstallAndroid86 $BRIDGE
+#	isoImportVirtualBox <virtualBox name> <KVM name>
 fi
 
 #####################################################################
@@ -1085,8 +1135,7 @@ if [[ ! -z "$DO_WINE" ]]; then
 		exit 1
 	fi
 
-	addBinToPath '.bashrc' '/opt/wine-staging/bin'
-	addBinToPath '.zshrc'  '/opt/wine-staging/bin'
+	addBinToPath '.profile' '/opt/wine-staging/bin' after
 
 	apt install mono-complete
 	apt install winetricks
@@ -1382,11 +1431,12 @@ fi
 if [[ ! -z "$DO_ATOM" ]]; then
 	echo '######### install Atom IDE'
 	ATOM_URL='https://github.com/atom/atom/releases'
-	ATOM_REL='v1.46.0'
+	ATOM_REL='1.51.0'
 	ATOM_DEF='atom-amd64.deb'
-	ATOM_SRC='atom_*.deb'
-	ATOM_DRV=$(downloadDriver $ATOM_URL $ATOM_URL/download/$ATOM_REL/$ATOM_DEF $ATOM_SRC)
+	ATOM_SRC='atom-*.deb'
+	ATOM_DRV=$(downloadDriver $ATOM_URL $ATOM_URL/download/v$ATOM_REL/$ATOM_DEF $ATOM_SRC)
 
+	apt install gvfs-bin
 	dpkg -i $ATOM_DRV
 
 	atom --version
@@ -1400,36 +1450,18 @@ fi
 if [[ ! -z "$DO_CONKY" ]]; then
 	echo '######### install Conky'
 	apt install conky-all
+	apt install conky curl lm-sensors hddtemp
 
-# project dead
-#  CONKY_URL=https://github.com/teejee2008/conky-manager/releases
-#  CONKY_REL='v2.4'
-#  CONKY_DEF='conky-manager-v2.4-amd64.deb'
-#  CONKY_SRC='conky-manager-*-amd64.deb'
-#  CONKY_DRV=$(downloadDriver $CONKY_URL $CONKY_URL/download/$CONKY_REL/$CONKY_DEF $CONKY_SRC)
+	sudo -u $SUDO_USER mkdir -p $HOME_USER/.conky
 
-#  CONKY_FONT_URL=http://mxrepo.com/mx/repo/pool/main/m/mx-conky/
-#  CONKY_FONT_REL='20.4'
-#  CONKY_FONT_DEF='mx-conky_20.4_amd64.deb'
-#  CONKY_FONT_SRC='mx-conky_*_amd64.deb'
-#  CONKY_FONT_DRV=$(downloadDriver $CONKY_FONT_URL $CONKY_FONT_URL/$CONKY_FONT_DEF $CONKY_FONT_SRC)
-#  dpkg -i $CONKY_FONT_DRV
-
-#  CONKY_URL=http://mxrepo.com/mx/repo/pool/main/c/conky-manager/
-#  CONKY_REL='2.7'
-#  CONKY_DEF='conky-manager_2.7+dfsg1-3mx19+2_amd64.deb'
-#  CONKY_SRC='conky-manager_*+dfsg1-3mx19+2_amd64.deb'
-#  CONKY_DRV=$(downloadDriver $CONKY_URL $CONKY_URL/$CONKY_DEF $CONKY_SRC)
-#  dpkg -i $CONKY_DRV
-
-#  CONKY_BUILDS='http://ppa.launchpad.net/tomtomtom/conky-manager/ubuntu'
-#  cat <<- EOT > $SOURCES_DIR/conky.list
-#	deb     [arch=amd64,i386] $CONKY_BUILDS focal main
-#	deb-src [arch=amd64,i386] $CONKY_BUILDS focal main
-#	EOT
-#  apt-key adv --keyserver keyserver.ubuntu.com --recv-keys b90e9186f0e836fb
-#  apt update
-#  apt install conky-manager
+# outdated !!!
+#	CONKY_URL=http://mxrepo.com/mx/repo/pool/main/c/conky-manager
+#	CONKY_REL='2.7'
+#	CONKY_DEF='conky-manager_2.7+dfsg1-5mx19+1_amd64.deb'
+#	CONKY_SRC='conky-manager_*.deb'
+#	CONKY_DRV=$(downloadDriver $CONKY_URL $CONKY_URL/$CONKY_DEF $CONKY_SRC)
+#	apt install libgee-0.8-2
+#	dpkg -i $CONKY_DRV
 
 	conky --version
 fi
@@ -1558,6 +1590,7 @@ if [[ ! -z "$DO_OHMYZ" ]]; then
 	sudo -u $SUDO_USER bash -c "$(curl -fsSL https://raw.github.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
 	sudo -u $SUDO_USER sed -i '0,/ZSH_THEME="[^"]*"/s//ZSH_THEME="robbyrussell"/' .zshrc     # ZSH_THEME="robbyrussell"
 	sudo -u $SUDO_USER sort .bash_history | uniq | awk '{print ": :0:;"$0}' >> .zsh_history
+	sudo -u $SUDO_USER echo 'source ~/.profile' >> .zshrc
 
 	logoutNow
 fi
@@ -1576,7 +1609,6 @@ fi
 #####################################################################
 ######### Samba
 # https://devconnected.com/how-to-install-samba-on-debian-10-buster/
-
 if [[ ! -z "$DO_SAMBA" ]]; then
 	echo '######### install Samba Server'
 
@@ -1659,8 +1691,6 @@ fi
 #####################################################################
 #####################################################################
 ######### Access Windows Share
-FSTAB='/etc/fstab'
-
 if [[ ! -z "$DO_CIFS" ]]; then
 	echo '######### install Access Windows Share'
 
@@ -1698,11 +1728,11 @@ if [[ ! -z "$DO_CIFS" ]]; then
 	mount -t cifs -o credentials=$WIN_CREDENTIALS,$WIN_OPTIONS //$WINDOWS_DOMAIN/d /mnt/work_d
 	mount -t cifs -o credentials=$WIN_CREDENTIALS,$WIN_OPTIONS //$WINDOWS_DOMAIN/e /mnt/work_e
 
-	if ! grep -F -q "//$WINDOWS_DOMAIN" $FSTAB ; then
-		if [[ ! -f "$FSTAB.old" ]]; then
-			cp $FSTAB $FSTAB.old
+	if ! grep -F -q "//$WINDOWS_DOMAIN" /etc/fstab ; then
+		if [[ ! -f "/etc/fstab.old" ]]; then
+			cp /etc/fstab /etc/fstab.old
 		fi
-		cat <<- EOT >> $FSTAB
+		cat <<- EOT >> /etc/fstab
 		//$WINDOWS_DOMAIN/c  /mnt/work_c  cifs  credentials=$WIN_CREDENTIALS,$WIN_OPTIONS 0 0
 		//$WINDOWS_DOMAIN/d  /mnt/work_d  cifs  credentials=$WIN_CREDENTIALS,$WIN_OPTIONS 0 0
 		//$WINDOWS_DOMAIN/e  /mnt/work_e  cifs  credentials=$WIN_CREDENTIALS,$WIN_OPTIONS 0 0
@@ -1790,8 +1820,8 @@ if [[ ! -z "$DO_SNAPSHOT" ]]; then
 	echo "usb backup uuid=$AUTO_BACKUP_UUID"
 	if [[ ! -z "$AUTO_BACKUP_UUID" ]]; then
 		echo "backup  -fstype=ext2,sync,rw,user,noauto  :/dev/disk/by-uuid/$AUTO_BACKUP_UUID" > $AUTO_CONF
-		if ! grep -F -q "$AUTO_BACKUP_UUID" $FSTAB ; then
-			echo "UUID=$AUTO_BACKUP_UUID $AUTO_DIR ext2 noauto,rw 0 0" >> $FSTAB
+		if ! grep -F -q "$AUTO_BACKUP_UUID" /etc/fstab ; then
+			echo "UUID=$AUTO_BACKUP_UUID $AUTO_DIR ext2 noauto,rw 0 0" >> /etc/fstab
 		fi
 	fi
 
@@ -1805,20 +1835,6 @@ fi
 if [[ ! -z "$DO_TEST" ]]; then
 	echo 'nothing here for now'
 
-# isoInstallWindows10 $BRIDGE
+#	isoInstallWindows10 $BRIDGE
 
-#	RC_LOCAL='/etc/rc.d/rc.local'
-#	TEST_FILE='/opt/scripts/run-script-on-boot.sh'
-#	TEST_OUTPUT='/root/on-boot-output.txt'
-
-#	cat <<- EOT > $TEST_FILE
-#	#!/bin/bash
-#	date     >> $TEST_OUTPUT
-#	hostname >> $TEST_OUTPUT
-#	EOT
-
-#	chmod +x $TEST_FILE
-#	chmod +x $RC_LOCAL
-#	echo $TEST_FILE | sudo -u $SUDO_USER tee -a $RC_LOCAL > /dev/null
-#	reboot
 fi
