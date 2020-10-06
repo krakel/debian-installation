@@ -9,9 +9,12 @@ Commands:
   help      this help
   test      only script tests
 
-  user      create new user
+  src       update raspian (use this first)
 
   flash     update firmware
+  ssd       update ssd
+  user      create new user
+
   ohmyz     ohmyz shell extension
   ssh       ssh configuration
   tools     some tools
@@ -32,6 +35,7 @@ declare -A SELECT=(
 	[next]=DO_NEXT_CLOUD
 	[ohmyz]=DO_OHMYZ
 	[src]=DO_SOURCE
+	[ssd]=DO_SSD
 	[ssh]=DO_SSH
 	[test]=DO_TEST
 	[tools]=DO_TOOLS
@@ -100,6 +104,11 @@ function breakNow() {
 function rebootNow() {
 	continueNow 'You NEED to reboot now!'
 	systemctl reboot
+}
+
+function powerOFF() {
+	continueNow 'You NEED to poweroff now!'
+	systemctl poweroff
 }
 
 # insertPathFkts file
@@ -211,9 +220,30 @@ if [[ ! -z "$DO_SOURCE" ]]; then
 	update-ca-certificates --fresh
 	sudo -u $SUDO_USER mkdir -p $HOME_USER/Downloads
 
+#	https://www.raspberrypi.org/forums/viewforum.php?f=29&269769
+	rpi-update
+
 	rebootNow
 fi
 
+
+#####################################################################
+#####################################################################
+if [[ ! -z "$DO_SSD" ]]; then
+	MOUNT_SSD='/mnt/ssd'
+
+	lsblk
+
+	mkdir -p $MOUNT_SSD
+	mount /dev/sda2 $MOUNT_SSD
+	mkdir -p $MOUNT_SSD/boot
+	mount /dev/sda1 $MOUNT_SSD/boot
+
+	cp /boot/*.dat $MOUNT_SSD
+	cp /boot/*.elf $MOUNT_SSD
+
+	powerOFF
+fi
 
 #####################################################################
 #####################################################################
@@ -258,11 +288,10 @@ if [[ ! -z "$DO_FLASH" ]]; then
 	if [[ -f "$BOOT_DRV" ]]; then
 		continueNow "Do you want to install the firmware '$BOOT_DRV' now?"
 		rpi-eeprom-update -d -f "$BOOT_DRV"
+		raspi-config
+
 		rebootNow
 	fi
-
-#	https://www.raspberrypi.org/forums/viewforum.php?f=29&269769
-#	rpi-update
 fi
 
 #####################################################################
@@ -270,17 +299,22 @@ fi
 if [[ ! -z "$DO_SSH" ]]; then
 	SSH_CONF='/etc/ssh/sshd_config'
 	SSH_PORT=22
+	SSH_USER="$HOME_USER/.ssh"
+	SSH_AUTH=$SSH_USER/authorized_keys
 
 	usermod -aG ssh $SUDO_USER
-	sudo -u $SUDO_USER ssh-keygen -b 4096
 
-	SSH_AUT=$HOME_USER/.ssh/authorized_keys
+	sudo -u $SUDO_USER mkdir -p $SSH_USER
+	sudo -u $SUDO_USER touch $SSH_AUTH
 
-	sudo -u $SUDO_USER touch $SSH_AUT
-	chown $SUDO_USER:ssh $SSH_AUT
-	chmod 660 $SSH_AUT
+	chmod 700 $SSH_USER
+	chown $SUDO_USER:ssh $SSH_AUTH
+	chmod 660 $SSH_AUTH
 
-	sudo -u $SUDO_USER cat $HOME_USER/.ssh/id_rsa >> $SSH_AUT
+	if [[ ! -f "$SSH_USER/id_raspi.pub" ]]; then
+		sudo -u $SUDO_USER ssh-keygen -b 4096 -f $SSH_USER/id_raspi
+	fi
+	sudo -u $SUDO_USER cat $SSH_USER/id_raspi.pub >> $SSH_AUTH
 
 	if [[ ! -f "$SSH_CONF.old" ]];
 		mv "$SSH_CONF" "$SSH_CONF.old"
