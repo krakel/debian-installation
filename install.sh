@@ -22,6 +22,7 @@ Commands:
   amd       amd/ati driver         (1 reboot)
   nvidia    nvidia driver          (1 reboot)
   nvidia2   nvidia driver official (1 reboot, 2 runs)
+  nvidia3   nvidia reinstall driver
   visudo    some sudo cmd definitions
 
   agent     autostart ssh-agent
@@ -86,6 +87,7 @@ declare -A SELECT=(
 	[mozilla]=DO_MOZILLA
 	[multimc]=DO_MULTI_MC
 	[nvidia2]=DO_NVIDIA_OFFICAL
+	[nvidia3]=DO_NVIDIA_REINSTALL
 	[nvidia]=DO_NVIDIA
 	[ohmyz]=DO_OHMYZ
 	[pwsafe]=DO_PASSWORD_SAFE
@@ -453,9 +455,9 @@ if [[ ! -z "$DO_TOOLS" ]]; then
 	fi
 
 	mkdir -p /opt/bin
-	addBinToPath '.profile' '/opt/bin' after
-	addBinToPath '.profile' "$HOME_USER/bin"
-	addBinToPath '.profile' "$HOME_USER/.local/bin"
+	addBinToPath    '.profile' '/opt/bin' after
+	addBinToPath    '.profile' "$HOME_USER/bin"
+	addBinToPath    '.profile' "$HOME_USER/.local/bin"
 	addSudoComplete '.profile'
 
 	#sudo -u $SUDO_USER echo 'source ~/.profile' >> .bashrc # already read by bash
@@ -489,10 +491,10 @@ function graphicCheckCard() {
 #####################################################################
 #####################################################################
 ######### NVIDIA driver 440.xx
-if [[ ! -z "$DO_NVIDIA" ]]; then
-	NVIDIA_STEP1='nvidia-step1'
-	NVIDIA_STEP2='nvidia-step2'
+NVIDIA_STEP1='nvidia-step1'
+NVIDIA_STEP2='nvidia-step2'
 
+if [[ ! -z "$DO_NVIDIA" ]]; then
 	graphicCheckCard 'NVIDIA'
 	echo "######### install NVIDIA driver for $OPSYSTEM"
 	dpkg --add-architecture i386
@@ -546,6 +548,11 @@ if [[ ! -z "$DO_NVIDIA" ]]; then
 	fi
 fi
 
+if [[ ! -z "$DO_NVIDIA_REINSTALL" ]]; then
+	rm -f $NVIDIA_STEP2
+	systemctl set-default multi-user.target
+	rebootNow
+fi
 #####################################################################
 #####################################################################
 ######### AMD driver
@@ -674,7 +681,7 @@ if [[ ! -z "$DO_KVM" ]]; then
 		local theBridge=$1
 		local thePort=$2
 
-		cat <<- 'EOT' > "/etc/network/interfaces.d/$theBridge"
+		cat <<- EOT > "/etc/network/interfaces.d/$theBridge"
 		# The primary network interface
 		auto $thePort
 		iface $thePort inet manual
@@ -706,7 +713,7 @@ if [[ ! -z "$DO_KVM" ]]; then
 		local theBridge=$1
 		local activeBridge="/tmp/activate-$theBridge.yaml"
 
-		cat <<- 'EOT' | sudo -u $SUDO_USER tee "$activeBridge" > /dev/null
+		cat <<- EOT | sudo -u $SUDO_USER tee "$activeBridge" > /dev/null
 		<network>
 		  <name>$theBridge</name>
 		  <forward mode="bridge"/>
@@ -1629,7 +1636,7 @@ if [[ ! -z "$DO_SAMBA" ]]; then
 	function sambaCreateSmbUserConfig() {
 		local smbUser=$1
 		if ! grep -F -q "[$smbUser]" $SAMBA_CONF ; then
-			cat <<- 'EOT' >> $SAMBA_CONF
+			cat <<- EOT >> $SAMBA_CONF
 			[$smbUser]
 			  path = $SAMBA_SHARE/$smbUser
 			  read only = no
@@ -1651,7 +1658,7 @@ if [[ ! -z "$DO_SAMBA" ]]; then
 	chgrp sambashare $SAMBA_SHARE
 
 	if ! grep -F -q '[Docs]' $SAMBA_CONF ; then
-		cat <<- 'EOT' >> $SAMBA_CONF
+		cat <<- EOT >> $SAMBA_CONF
 		[Docs]
 		  path = $SAMBA_SHARE
 		  writable = yes

@@ -21,6 +21,8 @@ Commands:
   wlan      wlan configuration
 
   apache    Apache 2 configuration
+  ssl       Apache 2 SSL Certificate
+  lets      Apache 2 SSL Certificate with LetsEncrypt
   bind      bind9 dns service
   maria     database configuration
   next      next cloud
@@ -31,12 +33,14 @@ declare -A SELECT=(
 	[apache]=DO_APACHE
 	[bind]=DO_BIND
 	[flash]=DO_FLASH
+	[lets]=DO_LETS_ENCRYPT
 	[maria]=DO_MARIA
 	[next]=DO_NEXT_CLOUD
 	[ohmyz]=DO_OHMYZ
 	[src]=DO_SOURCE
 	[ssd]=DO_SSD
 	[ssh]=DO_SSH
+	[ssl]=DO_SSL
 	[test]=DO_TEST
 	[tools]=DO_TOOLS
 	[user]=DO_USER
@@ -62,6 +66,11 @@ while [[ $# -gt 0 ]]; do
 done
 
 RASP_NAME=rasp1
+RASP_IP=192.168.0.10
+RASP_DEF=192.168.0.1
+
+MY_DOMAIN=imhaus.ddns.net
+
 SOURCES_DIR=/etc/apt/sources.list.d
 SUDO_USER=$(logname)
 HOME_USER=/home/$SUDO_USER
@@ -183,6 +192,17 @@ function addExportEnv() {
 	fi
 }
 
+function addSudoComplete() {
+	if ! grep -F -q 'complete -cf sudo' $1 ; then
+		cat <<- 'EOT' | sudo -u $SUDO_USER tee -a $1 > /dev/null
+		if [ "$PS1" ]; then
+		  complete -cf sudo
+		fi
+		EOT
+	fi
+
+}
+
 # installLib lib-name
 function installLib() {
 	ldconfig -p | grep -F "$1"
@@ -254,12 +274,12 @@ if [[ ! -z "$DO_USER" ]]; then
 
 	adduser $NEW_USER
 
-	su - root -c bash -c "/sbin/usermod -aG sudo $NEW_USER"
+	usermod -aG sudo $NEW_USER
 	sed -i "s/^SUDO_USER .*/$NEW_USER ALL=(ALL:ALL) ALL/" /etc/sudoers
 
 	sudo -u $NEW_USER cp -rf /home/$SUDO_USER/* /home/$NEW_USER
 
-	deluser $SUDO_USER sudo
+#	deluser $SUDO_USER sudo
 	echo "execute: userdel --remove $SUDO_USER"
 
 	logoutNow
@@ -269,11 +289,11 @@ fi
 #####################################################################
 if [[ ! -z "$DO_FLASH" ]]; then
 	EEPROM=/etc/default/rpi-eeprom-update
-	BOOT_LDR=/lib/fimrware/raspberrypi/bootloader/stable
+	BOOT_LDR=/lib/firmware/raspberrypi/bootloader/stable
 
 	apt install rpi-eeprom
 
-	if [[ ! -f "$EEPROM.old" ]];
+	if [[ ! -f "$EEPROM.old" ]]; then
 		mv "$EEPROM" "$EEPROM.old"
 	fi
 	echo 'FIRMWARE_RELEASE_STATUS="stable"' > $EEPROM
@@ -284,7 +304,7 @@ if [[ ! -z "$DO_FLASH" ]]; then
 
 	ls -al $BOOT_LDR
 
-	BOOT_DRV=$(ls -t "$BOOT_LDR/pieeprom*.bin" 2>/dev/null | head -1)
+	BOOT_DRV=$(ls -t $BOOT_LDR/pieeprom*.bin 2>/dev/null | head -1)
 	if [[ -f "$BOOT_DRV" ]]; then
 		continueNow "Do you want to install the firmware '$BOOT_DRV' now?"
 		rpi-eeprom-update -d -f "$BOOT_DRV"
@@ -316,7 +336,7 @@ if [[ ! -z "$DO_SSH" ]]; then
 	fi
 	sudo -u $SUDO_USER cat $SSH_USER/id_raspi.pub >> $SSH_AUTH
 
-	if [[ ! -f "$SSH_CONF.old" ]];
+	if [[ ! -f "$SSH_CONF.old" ]]; then
 		mv "$SSH_CONF" "$SSH_CONF.old"
 	fi
 
@@ -382,12 +402,19 @@ if [[ ! -z "$DO_SSH" ]]; then
 	#ufw enable
 
 	#iptables
-	iptables -A INPUT -p tcp -m tcp --dport 22 -m state --state NEW -m recent --set --name SSH --mask 255.255.255.255 --rsource
-	iptables -A INPUT -p tcp -m tcp --dport 22 -m state --state NEW -m recent --update --seconds 600 --hitcount 5 --rttl --name SSH --mask 255.255.255.255 --rsource -j DROP
+#	iptables -F
+#	iptables -X
+#	iptablex -P INPUT   DROP
+#	iptablex -P OUTPUT  DROP
+#	iptablex -P FORWARD DROP
+#	iptables -A INPUT  -i lo -j ACCEPT
+#	iptables -A OUTPUT -i lo -j ACCEPT
+	iptables -A INPUT -p tcp -m tcp --dport 22           -m state --state NEW -m recent --set    --name SSH --mask 255.255.255.255 --rsource
+	iptables -A INPUT -p tcp -m tcp --dport 22 -j DROP   -m state --state NEW -m recent --update --name SSH --mask 255.255.255.255 --rsource --seconds 600 --hitcount 5 --rttl
 	iptables -A INPUT -p tcp -m tcp --dport 22 -j ACCEPT
-	iptables -A INPUT -s 101.251.197.238/32 -p tcp -m tcp --dport 22 -j REJECT --reject-with icmp-host-prohibited
-	iptables -A INPUT -s 118.0.0.0/8        -p tcp -m tcp --dport 22 -j REJECT --reject-with icmp-host-prohibited
-	iptables -A INPUT -s 119.0.0.0/9        -p tcp -m tcp --dport 22 -j REJECT --reject-with icmp-host-prohibited
+	iptables -A INPUT -p tcp -m tcp --dport 22 -j REJECT -s 101.251.197.238/32 --reject-with icmp-host-prohibited
+	iptables -A INPUT -p tcp -m tcp --dport 22 -j REJECT -s 118.0.0.0/8        --reject-with icmp-host-prohibited
+	iptables -A INPUT -p tcp -m tcp --dport 22 -j REJECT -s 119.0.0.0/9        --reject-with icmp-host-prohibited
 
 	RULES_DST="/etc/iptables.rules"
 	RULES_BIN="/etc/network/if-pre-up.d/network.sh"
@@ -422,8 +449,15 @@ fi
 #####################################################################
 #####################################################################
 if [[ ! -z "$DO_TOOLS" ]]; then
-	insertPathFkts     '.bashrc'
-	insertGenPasswdFkt '.bashrc'
+	insertPathFkts     '.profile'
+	insertGenPasswdFkt '.profile'
+	addSudoComplete    '.profile'
+
+	dpkg-reconfigure tzdata
+
+	apt install ntp
+	systemctl enable ntp
+	systemctl start  ntp
 fi
 
 #####################################################################
@@ -431,24 +465,29 @@ fi
 ETH0=$(ip addr | grep MULTICAST | head -1 | cut -d ' ' -f 2 | cut -d ':' -f 1)
 
 if [[ ! -z "$DO_BIND" ]]; then
-	function kvmCreateStatic() {
+	function netCreateStatic() {
 		local thePort=$1
 
-		cat <<- 'EOT' > "/etc/network/interfaces.d/$thePort"
-		# Configure bridge and give it a static ip
+		cat <<- EOT > "/etc/network/interfaces.d/$thePort"
+		auto $thePort
+
+		# The primary network interface
 		iface $thePort inet static
-		  address         192.168.0.10
+		  address         $RASP_IP
 		  broadcast       192.168.0.255
 		  netmask         255.255.255.0
-		  gateway         192.168.0.1
-		  dns-nameservers 192.168.0.1
-		  dns-search      192.168.0.1
+		  gateway         $RASP_DEF
+		  dns-nameservers $RASP_IP
+		  dns-search      $RASP_IP
 		EOT
 	}
 
-	kvmCreateStatic $ETH0
+	netCreateStatic $ETH0
 
-	if [[ ! -f "/etc/hostname.old" ]];
+	systemctl stop    dhcpcd
+	systemctl disable dhcpcd
+
+	if [[ ! -f "/etc/hostname.old" ]]; then
 		mv "/etc/hostname" "/etc/hostname.old"
 	fi
 	echo "$RASP_NAME" > /etc/hostname
@@ -460,7 +499,7 @@ if [[ ! -z "$DO_BIND" ]]; then
 		echo "127.0.0.1 $RASP_NAME.local $RASP_NAME" >> /etc/hosts
 	fi
 
-	if [[ ! -f "/etc/host.conf.old" ]];
+	if [[ ! -f "/etc/host.conf.old" ]]; then
 		mv "/etc/host.conf" "/etc/host.conf.old"
 	fi
 	echo 'order hosts,bind' > /etc/host.conf
@@ -516,7 +555,7 @@ if [[ ! -z "$DO_BIND" ]]; then
 	};
 	EOT
 
-	cat <<- 'EOT' > '/etc/bind/db.raspi'
+	cat <<- EOT > '/etc/bind/db.raspi'
 	$TTL 3D
 	@ IN SOA local. postmaster.local. (
 	  0000000001      ;serial
@@ -526,14 +565,14 @@ if [[ ! -z "$DO_BIND" ]]; then
 	  1D )            ;minimum
 
 	@ IN NS $RASP_NAME.local.
-	  IN A  192.168.0.10
-	$RASP_NAME IN A 192.168.0.10
+	  IN A  $RASP_IP
+	$RASP_NAME IN A $RASP_IP
 	game       IN A 192.168.0.20
 	work       IN A 192.168.0.30
-	router     IN A 192.168.0.1
+	router     IN A $RASP_DEF
 	EOT
 
-	cat <<- 'EOT' > '/etc/bind/rev.raspi'
+	cat <<- EOT > '/etc/bind/rev.raspi'
 	$TTL 3D
 	@ IN SOA local. postmaster.local. (
 	  0000000001      ;serial
@@ -552,23 +591,30 @@ if [[ ! -z "$DO_BIND" ]]; then
 
 	chown bind:bind *.raspi
 
-	cat <<- 'EOT' >> '/etc/bind/named.conf'
+	NAMED_CONF='/etc/bind/named.conf'
+	if ! grep -F -q 'logging {' $NAMED_CONF ; then
+		cat <<- 'EOT' >> $NAMED_CONF
 
-	logging {
-	  channel query.log {
-	    file "/var/lib/bind/bind_query.log" version 3 size 5m;
-	    // set the severity to dynamic to see the debug messages
-	    serverity dynamic;
-	    print-time yes;
-	  };
-	  category queries {
-	    query.log;
-	  };
-	};
-	EOT
+		logging {
+		  channel query.log {
+		    file "/var/lib/bind/bind_query.log" versions 3 size 5m;
+		    // set the severity to dynamic to see the debug messages
+		    severity dynamic;
+		    print-time yes;
+		  };
+		  category queries {
+		    query.log;
+		  };
+		};
+		EOT
+	fi
+	sed -i "s|^include \"/etc/bind/named.conf.options\";|#include \"/etc/bind/named.conf.options\";|" $NAMED_CONF
+	sed -i "s|^include \"/etc/bind/named.conf.local\";|#include \"/etc/bind/named.conf.local\";|"     $NAMED_CONF
 
 	systemctl enable  bind9
 	systemctl restart bind9
+
+	echo 'finished installation of Bind9'
 fi
 
 #####################################################################
@@ -581,9 +627,77 @@ if [[ ! -z "$DO_APACHE" ]]; then
 	apt install php libapache2-mod-php
 
 	mv "$WWW_DIR/index.html" "$WWW_DIR/index.old"
-	echo "<? phpinfo(); ?>" > "$WWW_DIR/index.php"
+	echo "<?php phpinfo(); ?>" > "$WWW_DIR/index.php"
 
 	systemctl enable apache2
+	systemctl start  apache2
+
+	echo 'finished installation of apache2'
+fi
+
+#####################################################################
+#####################################################################
+if [[ ! -z "$DO_SSL" ]]; then
+	SSL_CONF='/etc/apache2/ownssl'
+	SSL_DEF='/etc/apache2/sites-available/default-ssl.conf'
+	SSL_OLD='/etc/apache2/sites-old'
+
+	mkdir -p $SSL_CONF
+	openssl genrsa -out "$SSL_CONF/apachessl.pem"
+	openssl req -new -key "$SSL_CONF/apachessl.pem" -out "$SSL_CONF/apachessl.csr" -sha512 -subj "/C=DE/ST=Bayern/OU=Private/CN=$RASP_IP"
+	openssl x509 -days 365 -req -in "$SSL_CONF/apachessl.csr" -signkey "$SSL_CONF/apachessl.pem" -out "$SSL_CONF/apachessl.crt" -sha512
+
+	mkdir -p $SSL_OLD
+	if [[ ! -f "$SSL_OLD/default-ssl.conf" ]]; then
+		cp "$SSL_DEF" "$SSL_OLD"
+	fi
+
+	sed -i "s|\s*#SSLEngine .*|		SSLEngine on|" $SSL_DEF
+	sed -i "s|\s*SSLEngine .*|		SSLEngine on|"    $SSL_DEF
+	sed -i "s|\s*SSLCertificateFile .*|		SSLCertificateFile    $SSL_CONF/apachessl.crt|"    $SSL_DEF
+	sed -i "s|\s*SSLCertificateKeyFile .*|		SSLCertificateKeyFile $SSL_CONF/apachessl.pem|" $SSL_DEF
+
+	a2enmod ssl
+	a2ensite default-ssl
+
+	systemctl restart apache2
+	echo 'enabled ssl for apache2'
+fi
+
+#####################################################################
+#####################################################################
+if [[ ! -z "$DO_LETS_ENCRYPT" ]]; then
+	apt install certbot
+	apt install python3-pip
+
+	echo 'add the txt records to your dns provider'
+	certbot certonly --manual --preferred-challenge dns -d "*.$MY_DOMAIN" -d "$MY_DOMAIN"
+
+	python3 -m pip install --use-feature=2020-resolver --upgrade pip
+	python3 -m pip install --use-feature=2020-resolver setuptools
+	python3 -m pip install --use-feature=2020-resolver acme==1.8.0  # <-- need update
+	python3 -m pip install --use-feature=2020-resolver certbot-dns-nsone
+
+
+	echo "open https://my.nsone.net and create a account"
+	echo "add a zone with your domain $MY_DOMAIN"
+	echo "create a new API key LetsEncryptKey"
+	echo "deactivate all options except 'manage zone' and 'view zone'"
+	echo "copy the API key"
+	echo
+	read -p "enter your api key:" -s API_KEY
+	if [[ -z "$API_KEY" ]]; then
+		echo "missing api key!!!"
+		exit
+	fi
+
+	API_KEY_FILE='/root/api.key'
+	echo "dns_nsone_api_key = $API_KEY" > $API_KEY_FILE
+	chmod 600 $API_KEY_FILE
+
+	certbot certonly --renew-by-default --dns-nsone --dns-nsone-credentials $API_KEY_FILE -d "*.$MY_DOMAIN" -d "$MY_DOMAIN" # --dry-run
+#	certbot renew --quiet # --dry-run
+
 fi
 
 #####################################################################
@@ -597,23 +711,29 @@ if [[ ! -z "$DO_MARIA" ]]; then
 		rebootNow
 	fi
 
-	echo "You need a phpmyadmin password!"
-	continueNow
-
-	apt install phpmyadmin
-
 	echo "you need your root password"
 	echo "Change the root password?              -> no"
 	echo "Remove anonymous user?                 -> yes"
 	echo "Disallow root login remotely?          -> yes"
-	echo "Remove test database and access to it? -> no"
+	echo "Remove test database and access to it? -> yes"
 	echo "Reload privilege tables now?           -> yes"
 	mysql_secure_installation
 
-	echo ""                                    >> /etc/apache2/apache2.conf
-	echo "Include /etc/phpmyadmin/apache.conf" >> /etc/apache2/apache2.conf
+	#echo "You need a phpmyadmin password!"
+	#continueNow
+	#apt install phpmyadmin <-- not supported by debian anymore
+	#echo ""                                    >> /etc/apache2/apache2.conf
+	#echo "Include /etc/phpmyadmin/apache.conf" >> /etc/apache2/apache2.conf
 
+	ADMINER_DIR='/etc/adminer'
+	apt install adminer
+	mkdir -p $ADMINER_DIR
+	echo 'Alias /adminer /usr/share/adminer/adminer' | tee /etc/adminer/adminer.conf > /dev/null
+	ln -s $ADMINER_DIR/adminer.conf /etc/apache2/conf-available/adminer.conf
+
+	a2enconf adminer
 	systemctl restart apache2
+	echo 'finished installation of Maria DB'
 fi
 
 #####################################################################
@@ -627,7 +747,7 @@ if [[ ! -z "$DO_NEXT_CLOUD" ]]; then
 	NEXT_USER='nextuser'
 	NEXT_TEMP='/tmp/script.sql'
 
-	echo -n "type your $NEXT_DATA db password for $NEXT_USER:"
+	echo -n "type your $NEXT_DATA password for $NEXT_USER:"
 	read -s NEXT_PW
 	echo
 
@@ -640,10 +760,13 @@ if [[ ! -z "$DO_NEXT_CLOUD" ]]; then
 
 	mysql -u root -p < $NEXT_TEMP
 
-	sudo -u $SUDO_USER wget -P Downloads "https://download.nextcloud.com/server/releases/latest.zip"
-	sudo -u $SUDO_USER unzip Downloads/latest.zip -d $HOME_USER/nextcloud
+	if [[ ! -f "Downloads/nextcloud.zip" ]]; then
+		sudo -u $SUDO_USER wget -P Downloads -O nextcloud.zip "https://download.nextcloud.com/server/releases/latest.zip"
+	fi
+	sudo -u $SUDO_USER unzip Downloads/nextcloud.zip -d $HOME_USER
 	mv $HOME_USER/nextcloud $WWW_DIR
 	chown -R www-data:www-data $WWW_DIR/nextcloud
+	echo 'finished installation of next cloud'
 fi
 
 #####################################################################
@@ -659,9 +782,6 @@ if [[ ! -z "$DO_OHMYZ" ]]; then
 	sudo -u $SUDO_USER bash -c "$(curl -fsSL https://raw.github.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
 	sudo -u $SUDO_USER sed -i '0,/ZSH_THEME="[^"]*"/s//ZSH_THEME="robbyrussell"/' .zshrc     # ZSH_THEME="robbyrussell"
 	sudo -u $SUDO_USER sort .bash_history | uniq | awk '{print ": :0:;"$0}' >> .zsh_history
-
-	insertPathFkts     '.zshrc'
-	insertGenPasswdFkt '.zshrc'
 
 	logoutNow
 fi
