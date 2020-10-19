@@ -27,6 +27,7 @@ Commands:
 
   agent     autostart ssh-agent
   cifs      Access Windows Share
+  cifsk     Access Windows Share to KVM client
   conky     lightweight free system monitor
   ohmyz     ohmyz shell extension
   samba     Samba Server, access from Windows (not used, I use only cifs)
@@ -46,11 +47,13 @@ Commands:
   java      java 8+14 jdk
   multimc   Minecraft MultiMC
 
+  chatty    Chatty
   discord   Discord
   dream     Dreambox Edit
   mozilla   Firefox + Thunderbird
   spotify   Spotify, some music
-  twitch    twitch gui + VideoLan + Chatty
+  twitch    twitch gui
+  video     VideoLan
 
   atom      Atom IDE
   cuda      CudaText editor (little bit unusable)
@@ -70,7 +73,9 @@ declare -A SELECT=(
 	[amd]=DO_AMD
 	[anbox]=DO_ANBOX
 	[atom]=DO_ATOM
+	[chatty]=DO_CHATTY
 	[cifs]=DO_CIFS
+	[cifsk]=DO_CIFS_KVM
 	[conky]=DO_CONKY
 	[cuda]=DO_CUDA_TEXT
 	[discord]=DO_DISCORD
@@ -102,6 +107,7 @@ declare -A SELECT=(
 	[test]=DO_TEST
 	[tools]=DO_TOOLS
 	[twitch]=DO_TWITCH_GUI
+	[video]=DO_VIDEOLAN
 	[viewnior]=DO_VIEWNIOR
 	[virtual]=DO_VIRTUAL_BOX
 	[visudo]=DO_VISUDO
@@ -132,8 +138,8 @@ HOME_USER=/home/$SUDO_USER
 cd $HOME_USER
 
 # I use the same name
-WINDOWS_USER=$SUDO_USER       # change this to your windows user name
-WINDOWS_DOMAIN='work.local'	# change this to your windows domain
+WIN_USER=$SUDO_USER       # change this to your windows user name
+WIN_DOMAIN='work.local'	# change this to your windows domain
 
 # apt update      # refreshes repository index
 # apt upgrade     # upgrades all upgradable packages
@@ -1364,10 +1370,10 @@ if [[ ! -z "$DO_MOZILLA" ]]; then
 	apt install -t unstable firefox
 	apt install -t unstable thunderbird
 
-	FIREFOX_WINDOWS="/mnt/work_c/Users/$WINDOWS_USER/AppData/Roaming/Mozilla/Firefox"
+	FIREFOX_WINDOWS="/mnt/work_c/Users/$WIN_USER/AppData/Roaming/Mozilla/Firefox"
 	FIREFOX_LINUX="$HOME_USER/.mozilla/firefox"
 
-	THUNDERBIRD_WINDOWS="/mnt/work_c/Users/$WINDOWS_USER/AppData/Roaming/Thunderbird"
+	THUNDERBIRD_WINDOWS="/mnt/work_c/Users/$WIN_USER/AppData/Roaming/Thunderbird"
 	THUNDERBIRD_LINUX="$HOME_USER/.thunderbird"
 
 	mozillaCopyProfile 'Download/firefox.zip'     $FIREFOX_LINUX     $FIREFOX_WINDOWS
@@ -1392,14 +1398,10 @@ fi
 
 #####################################################################
 #####################################################################
-######### twitch gui + VideoLan + Chatty
-# https://www.videolan.org
+######### twitch gui
 # https://github.com/streamlink/streamlink-twitch-gui
 # https://www.hiroom2.com/2018/05/27/ubuntu-1804-twitch-en/
 if [[ ! -z "$DO_TWITCH_GUI" ]]; then
-	echo '######### install VideoLan'
-	apt install vlc
-
 	echo '######### install Streamlink'
 	apt install streamlink
 
@@ -1414,16 +1416,32 @@ if [[ ! -z "$DO_TWITCH_GUI" ]]; then
 	apt install xdg-utils libgconf-2-4
 	/opt/streamlink-twitch-gui/add-menuitem.sh
 	ln -s /opt/streamlink-twitch-gui/start.sh /usr/bin/streamlink-twitch-gui
+fi
 
+#####################################################################
+#####################################################################
+######### VideoLan
+# https://www.videolan.org
+if [[ ! -z "$DO_VIDEOLAN" ]]; then
+	echo '######### install VideoLan'
+	apt install vlc
+
+fi
+
+#####################################################################
+#####################################################################
+######### Chatty
+if [[ ! -z "$DO_CHATTY" ]]; then
 	echo '######### install Chatty'
 	apt install default-jre
 
 	CHATTY_URL='https://github.com/chatty/chatty/releases'
-	CHATTY_REL='0.11'
+	CHATTY_REL='0.13'
 	CHATTY_DEF="Chatty_$CHATTY_REL.zip"
 	CHATTY_SRC='Chatty_*.zip'
 	CHATTY_DRV=$(downloadDriver $CHATTY_URL $CHATTY_URL/download/v$CHATTY_REL/$CHATTY_DEF $CHATTY_SRC)
 
+	rm -rf /opt/chatty/*
 	unzip $CHATTY_DRV -d /opt/chatty
 fi
 
@@ -1701,14 +1719,14 @@ fi
 if [[ ! -z "$DO_CIFS" ]]; then
 	echo '######### install Access Windows Share'
 
-	echo "used windows domain: $WINDOWS_DOMAIN"
-	echo "used windows user: $WINDOWS_USER"
+	echo "used windows domain: $WIN_DOMAIN"
+	echo "used windows user: $WIN_USER"
 	echo "default windows share names: work_c, work_d, work_e"
 	continueNow 'Do you want to use this values?'
 	echo
 
-	echo -n "type your windows password for $WINDOWS_USER:"
-	read -s WINDOWS_PW
+	echo -n "type your windows password for $WIN_USER:"
+	read -s WIN_PASSWORD
 	echo
 
 	apt install cifs-utils
@@ -1720,38 +1738,38 @@ if [[ ! -z "$DO_CIFS" ]]; then
 
 	WIN_CREDENTIALS='/etc/win-credentials'
 	cat <<- EOT > $WIN_CREDENTIALS
-	username=$WINDOWS_USER
-	password=$WINDOWS_PW
-	domain=$WINDOWS_DOMAIN
+	username=$WIN_USER
+	password=$WIN_PASSWORD
+	domain=$WIN_DOMAIN
 	EOT
-	chown root: $WIN_CREDENTIALS
+	chown root:root $WIN_CREDENTIALS
 	chmod 600 $WIN_CREDENTIALS
 
 	USER_UID=$(sudo -u $SUDO_USER id -u $SUDO_USER)
 	USER_GID=$(sudo -u $SUDO_USER id -g $SUDO_USER)
 	WIN_OPTIONS="noauto,uid=$USER_UID,gid=$USER_GID,forceuid,forcegid,dir_mode=0755,file_mode=0644"
 
-	mount -t cifs -o credentials=$WIN_CREDENTIALS,$WIN_OPTIONS //$WINDOWS_DOMAIN/c /mnt/work_c
-	mount -t cifs -o credentials=$WIN_CREDENTIALS,$WIN_OPTIONS //$WINDOWS_DOMAIN/d /mnt/work_d
-	mount -t cifs -o credentials=$WIN_CREDENTIALS,$WIN_OPTIONS //$WINDOWS_DOMAIN/e /mnt/work_e
+	mount -t cifs -o credentials=$WIN_CREDENTIALS,$WIN_OPTIONS //$WIN_DOMAIN/c /mnt/work_c
+	mount -t cifs -o credentials=$WIN_CREDENTIALS,$WIN_OPTIONS //$WIN_DOMAIN/d /mnt/work_d
+	mount -t cifs -o credentials=$WIN_CREDENTIALS,$WIN_OPTIONS //$WIN_DOMAIN/e /mnt/work_e
 
-	if ! grep -F -q "//$WINDOWS_DOMAIN" /etc/fstab ; then
+	if ! grep -F -q "//$WIN_DOMAIN" /etc/fstab ; then
 		if [[ ! -f "/etc/fstab.old" ]]; then
 			cp /etc/fstab /etc/fstab.old
 		fi
 		cat <<- EOT >> /etc/fstab
-		//$WINDOWS_DOMAIN/c  /mnt/work_c  cifs  credentials=$WIN_CREDENTIALS,$WIN_OPTIONS 0 0
-		//$WINDOWS_DOMAIN/d  /mnt/work_d  cifs  credentials=$WIN_CREDENTIALS,$WIN_OPTIONS 0 0
-		//$WINDOWS_DOMAIN/e  /mnt/work_e  cifs  credentials=$WIN_CREDENTIALS,$WIN_OPTIONS 0 0
+		//$WIN_DOMAIN/c  /mnt/work_c  cifs  credentials=$WIN_CREDENTIALS,$WIN_OPTIONS 0 0
+		//$WIN_DOMAIN/d  /mnt/work_d  cifs  credentials=$WIN_CREDENTIALS,$WIN_OPTIONS 0 0
+		//$WIN_DOMAIN/e  /mnt/work_e  cifs  credentials=$WIN_CREDENTIALS,$WIN_OPTIONS 0 0
 		EOT
 	fi
 
 	WIN_SHELL="/mnt/mount-win.sh"
 	cat <<- EOT > "$WIN_SHELL"
 	#!/bin/bash
-	mount //$WINDOWS_DOMAIN/c
-	mount //$WINDOWS_DOMAIN/d
-	mount //$WINDOWS_DOMAIN/e
+	mount //$WIN_DOMAIN/c
+	mount //$WIN_DOMAIN/d
+	mount //$WIN_DOMAIN/e
 	EOT
 	chmod +x $WIN_SHELL
 
@@ -1769,6 +1787,78 @@ if [[ ! -z "$DO_CIFS" ]]; then
 
 	createSudoer "win-cmds" <<- EOT
 	$SUDO_USER ALL= NOPASSWD: $WIN_SHELL
+	EOT
+
+	df -h
+fi
+
+#####################################################################
+#####################################################################
+if [[ ! -z "$DO_CIFS_KVM" ]]; then
+	echo '######### install Access Windows Share to KVM client'
+
+	WIN_DOMAIN_KVM="win10.local"
+
+	echo "used windows domain: $WIN_DOMAIN_KVM"
+	echo "used windows user: $WIN_USER"
+	echo "default windows share names: win10_c"
+	continueNow 'Do you want to use this values?'
+	echo
+
+	echo -n "type your windows password for $WIN_USER:"
+	read -s WIN_PASSWORD_KVM
+	echo
+
+	apt install cifs-utils
+
+	# my old windows disks
+	mkdir -p /mnt/win10_c
+
+	WIN_CREDENTIALS_KVM='/etc/win-credentials-kvm'
+	cat <<- EOT > $WIN_CREDENTIALS_KVM
+	username=$WIN_USER
+	password=$WIN_PASSWORD_KVM
+	domain=$WIN_DOMAIN_KVM
+	EOT
+	chown root:root $WIN_CREDENTIALS_KVM
+	chmod 600 $WIN_CREDENTIALS_KVM
+
+	USER_UID=$(sudo -u $SUDO_USER id -u $SUDO_USER)
+	USER_GID=$(sudo -u $SUDO_USER id -g $SUDO_USER)
+	WIN_OPTIONS="noauto,uid=$USER_UID,gid=$USER_GID,forceuid,forcegid,dir_mode=0755,file_mode=0644"
+
+	mount -t cifs -o credentials=$WIN_CREDENTIALS_KVM,$WIN_OPTIONS //$WIN_DOMAIN_KVM/c /mnt/win10_c
+
+	if ! grep -F -q "//$WIN_DOMAIN_KVM" /etc/fstab ; then
+		if [[ ! -f "/etc/fstab.old" ]]; then
+			cp /etc/fstab /etc/fstab.old
+		fi
+		cat <<- EOT >> /etc/fstab
+		//$WIN_DOMAIN_KVM/c  /mnt/win10_c  cifs  credentials=$WIN_CREDENTIALS_KVM,$WIN_OPTIONS 0 0
+		EOT
+	fi
+
+	WIN_SHELL_KVM="/mnt/mount-win-kvm.sh"
+	cat <<- EOT > "$WIN_SHELL_KVM"
+	#!/bin/bash
+	mount //$WIN_DOMAIN_KVM/c
+	EOT
+	chmod +x $WIN_SHELL_KVM
+
+	createDesktopEntry "windows.kvm.desktop" <<- EOT
+	[Desktop Entry]
+	Name=Windows Shares
+	Comment=mount windows folder
+	Exec=bash -c "sudo $WIN_SHELL_KVM > /dev/null 2>&1 & xdg-open /mnt/win10_c"
+	Icon=drive-removable-media
+	Terminal=false
+	Type=Application
+	Categories=System;Utility;FileTools;FileManager;
+	StartupNotify=true
+	EOT
+
+	createSudoer "win-cmds-kvm" <<- EOT
+	$SUDO_USER ALL= NOPASSWD: $WIN_SHELL_KVM
 	EOT
 
 	df -h
