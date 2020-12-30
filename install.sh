@@ -18,7 +18,8 @@ Commands:
   help      this help
   test      only script tests
 
-  src       debian testing (use this first)
+  src       debian testing         (use this first)
+  unstable  adding debian unstable (should nt be needed)
   amd       amd/ati driver         (1 reboot)
   nvidia    nvidia driver          (1 reboot)
   nvidia2   nvidia driver official (1 reboot, 2 runs)
@@ -33,6 +34,7 @@ Commands:
   samba     Samba Server, access from Windows (not used, I use only cifs)
   snap      rsnapshot+rsync backups on local system
   tools     xfce tools
+  etcher    bootable USB drives or SD cards
 
   kvm       KVM, QEMU with Virt-Manager (1 reboot)
   iso       install a iso
@@ -83,6 +85,7 @@ declare -A SELECT=(
 	[dream]=DO_DREAMBOX_EDIT
 	[dxvk]=DO_DXVK
 	[gpic]=DO_GPIC
+	[etcher]=DO_ETCHER
 	[iso]=DO_ISO
 	[java]=DO_JAVA
 	[kvm]=DO_KVM
@@ -107,6 +110,7 @@ declare -A SELECT=(
 	[test]=DO_TEST
 	[tools]=DO_TOOLS
 	[twitch]=DO_TWITCH_GUI
+	[unstable]=DO_UNSTABLE
 	[video]=DO_VIDEOLAN
 	[viewnior]=DO_VIEWNIOR
 	[virtual]=DO_VIRTUAL_BOX
@@ -132,14 +136,22 @@ while [[ $# -gt 0 ]]; do
 	shift
 done
 
-SOURCES_DIR=/etc/apt/sources.list.d
 SUDO_USER=$(logname)
-HOME_USER=/home/$SUDO_USER
-cd $HOME_USER
+HOME_USER="/home/$SUDO_USER"
+
+THIS_NAME=game
+THIS_IP=192.168.0.20
+THIS_DNS=192.168.0.10
+THIS_DEF=192.168.0.1
+THIS_DOMAIN='at-home'
 
 # I use the same name
-WIN_USER=$SUDO_USER       # change this to your windows user name
-WIN_DOMAIN='work.local'	# change this to your windows domain
+WIN_USER=$SUDO_USER              # change this to your windows user name
+WIN_DOMAIN="work.$THIS_DOMAIN"	# change this to your windows domain
+
+SOURCES_DIR='/etc/apt/sources.list.d'
+
+cd $HOME_USER
 
 # apt update      # refreshes repository index
 # apt upgrade     # upgrades all upgradable packages
@@ -175,7 +187,7 @@ fi
 #####################################################################
 function continueNow() {
 	echo
-	echo -n "$1 (Y/n)!"
+	echo -n "$1 (Y/n)"
 	read answer
 	if [[ "$answer" != "${answer#[Nn]}" ]]; then
 		exit 1
@@ -184,7 +196,7 @@ function continueNow() {
 
 function breakNow() {
 	echo
-	echo -n "$1 (y/N)!"
+	echo -n "$1 (y/N)"
 	read answer
 	if [[ "$answer" == "${answer#[Yy]}" ]]; then
 		exit 1
@@ -201,20 +213,20 @@ function insertPathFkts() {
 	if ! grep -F -q 'path_add()' $1 ; then
 		cat <<- 'EOT' | sudo -u $SUDO_USER tee -a $1 > /dev/null
 
-		path_add() {
-		  NEW_ELEMENT=${1%/}
-		  if [ -d "$1" ] && ! echo $PATH | grep -E -q "(^|:)$NEW_ELEMENT(:|$)" ; then
-		    if [ "$2" = "after" ] ; then
-		      PATH="$PATH:$NEW_ELEMENT"
-		    else
-		      PATH="$NEW_ELEMENT:$PATH"
-		    fi
-		  fi
-		}
+			path_add() {
+			  NEW_ELEMENT=${1%/}
+			  if [ -d "$1" ] && ! echo $PATH | grep -E -q "(^|:)$NEW_ELEMENT(:|$)" ; then
+			    if [ "$2" = "after" ] ; then
+			      PATH="$PATH:$NEW_ELEMENT"
+			    else
+			      PATH="$NEW_ELEMENT:$PATH"
+			    fi
+			  fi
+			}
 
-		path_rm() {
-		  PATH="$(echo $PATH | sed -e 's;\(^\|:\)${1%/}\(:\|\$\);\1\2;g' -e 's;^:\|:$;;g' -e 's;::;:;g')"
-		}
+			path_rm() {
+			  PATH="$(echo $PATH | sed -e 's;\(^\|:\)${1%/}\(:\|\$\);\1\2;g' -e 's;^:\|:$;;g' -e 's;::;:;g')"
+			}
 		EOT
 		# dont forget 'export PATH'
 	fi
@@ -229,8 +241,8 @@ function addBinToPath() {
 		echo "add '$2' to '$1'"
 		cat <<- EOT | sudo -u $SUDO_USER tee -a $1 > /dev/null
 
-		$addPathStr $3
-		export PATH
+			$addPathStr $3
+			export PATH
 		EOT
 	else
 		echo "'$1' already contain '$addPathStr'!"
@@ -246,19 +258,35 @@ function addExportEnv() {
 		echo "add '$exportStr' to '$1'"
 		cat <<- EOT | sudo -u $SUDO_USER tee -a $1 > /dev/null
 
-		$exportStr
+			$exportStr
 		EOT
 	else
 		echo "'$1' already contain '$exportStr'!"
 	fi
 }
 
+# addCommand file cmd
+function addCommand() {
+	local commandStr="$2"
+
+	if ! grep -F -q "$commandStr" $1 ; then
+		echo "add '$commandStr' to '$1'"
+		cat <<- EOT | sudo -u $SUDO_USER tee -a $1 > /dev/null
+
+			$commandStr
+		EOT
+	else
+		echo "'$1' already contain '$commandStr'!"
+	fi
+}
+
 function addSudoComplete() {
 	if ! grep -F -q 'complete -cf sudo' $1 ; then
 		cat <<- 'EOT' | sudo -u $SUDO_USER tee -a $1 > /dev/null
-		if [ "$PS1" ]; then
-		  complete -cf sudo
-		fi
+
+			if [ "$PS1" ]; then
+			  complete -cf sudo
+			fi
 		EOT
 	fi
 
@@ -323,64 +351,56 @@ function createSudoer() {
 }
 
 function addPgpKey() {
-	if [[ -z "$2" ]]; then
-		wget -nv $1 -O - | apt-key add -
-	else
-#		wget -nv $1 -O - | apt-key --keyring /etc/apt/trusted.gpg.d/$2 add -
-		wget -nv $1 -O - | gpg --no-default-keyring --keyring /tmp/$2 --import
-		gpg --keyring /tmp/$2 --export > /etc/apt/trusted.gpg.d/$2
+	local gpgFile=$1
+	local gpgServer=$2
+	local gpgKey=$3
+
+	if [[ -z "$gpgServer" ]]; then 			# old version
+		wget -nv $gpgFile -O - | apt-key add -
+	elif [[ -z "$gpgKey" ]]; then 			# new version
+		wget -nv $gpgServer -O - | gpg --no-default-keyring --keyring /tmp/$gpgFile --import
+		gpg --export --keyring /tmp/$gpgFile > /etc/apt/trusted.gpg.d/$gpgFile
+	else 												# use a key server
+		gpg --no-default-keyring --keyring /tmp/$gpgFile --keyserver $gpgServer --recv-keys $gpgKey
+#		gpg --ignore-time-conflict --no-options --no-default-keyring --secret-keyring /tmp/tmp.rh1myoBdSE --trustdb-name /etc/apt/trustdb.gpg --keyring /etc/apt/trusted.gpg --primary-keyring /etc/apt/trusted.gpg --keyserver keyserver.ubuntu.com --recv 7F0CEB10
+		gpg --export --keyring /tmp/$gpgFile > /etc/apt/trusted.gpg.d/$gpgFile
 	fi
 }
 
 #####################################################################
 # System
 #####################################################################
+SOURCES='/etc/apt/sources.list'
 
 #####################################################################
 #####################################################################
 if [[ ! -z "$DO_SOURCE" ]]; then
-	SOURCES='/etc/apt/sources.list'
-	ORIGINAL='/etc/apt/sources.orig'
-	TMPFILE='/tmp/sources.list'
-
 	if [[ ! -f $SOURCES ]]; then
 		echo "bad, missing file: $SOURCES"
 		exit 1
 	fi
 
+	ORIGINAL='/etc/apt/sources.orig'
+	TMPFILE='/tmp/sources.list'
+
 	if [[ -f $TMPFILE ]]; then
 		echo "delete old temp file: $TMPFILE"
 		rm -f $TMPFILE
 	fi
-
-	echo "create new source file: $TMPFILE"
 	touch $TMPFILE
 
 	cat <<- EOT > $TMPFILE
-	deb     http://deb.debian.org/debian               testing           main contrib non-free
-	deb-src http://deb.debian.org/debian               testing           main contrib non-free
+		deb     http://deb.debian.org/debian               testing           main contrib non-free
+		deb-src http://deb.debian.org/debian               testing           main contrib non-free
 
-	deb     http://deb.debian.org/debian               testing-updates   main contrib non-free
-	deb-src http://deb.debian.org/debian               testing-updates   main contrib non-free
+		deb     http://deb.debian.org/debian               testing-updates   main contrib non-free
+		deb-src http://deb.debian.org/debian               testing-updates   main contrib non-free
 
-	deb     http://security.debian.org/debian-security testing-security  main contrib non-free
-	deb-src http://security.debian.org/debian-security testing-security  main contrib non-free
+		deb     http://security.debian.org/debian-security testing-security  main contrib non-free
+		deb-src http://security.debian.org/debian-security testing-security  main contrib non-free
 
-	deb     http://deb.debian.org/debian/              sid               main contrib non-free
-	deb-src http://deb.debian.org/debian/              sid               main contrib non-free
-
-	# do not use backports !
-	# deb     http://deb.debian.org/debian/              testing-backports main contrib non-free
-	# deb-src http://deb.debian.org/debian/              testing-backports main contrib non-free
-
-	# deb     http://deb.debian.org/debian/              stable            main contrib non-free
-	# deb-src http://deb.debian.org/debian/              stable            main contrib non-free
-
-	# deb     http://security.debian.org                 stable/updates    main contrib non-free
-	# deb-src http://security.debian.org                 stable/updates    main contrib non-free
-
-	# deb     http://deb.debian.org/debian               buster-backports  main contrib non-free
-	# deb-src http://deb.debian.org/debian               buster-backports  main contrib non-free
+		deb     http://deb.debian.org/debian               sid               main contrib non-free
+		deb-src http://deb.debian.org/debian               sid               main contrib non-free
 	EOT
 
 	if [[ ! -f $ORIGINAL ]]; then
@@ -389,13 +409,13 @@ if [[ ! -z "$DO_SOURCE" ]]; then
 	mv $TMPFILE $SOURCES
 
 	cat <<- EOT > /etc/apt/preferences.d/debian-sid
-	Package: *
-	Pin: release n=testing
-	Pin-Priority: 900
+		Package: *
+		Pin: release n=testing
+		Pin-Priority: 900
 
-	Package: *
-	Pin: release n=sid
-	Pin-Priority: -10
+		Package: *
+		Pin: release n=sid
+		Pin-Priority: -10
 	EOT
 
 	dpkg --add-architecture i386
@@ -414,17 +434,50 @@ fi
 
 #####################################################################
 #####################################################################
+if [[ ! -z "$DO_UNSTABLE" ]]; then
+	if [[ ! -f $SOURCES ]]; then
+		echo "bad, missing file: $SOURCES"
+		exit 1
+	fi
+	if grep -F -q "unstable" $SOURCES ; then
+		echo "Debian unstable already installed!"
+		exit 1
+	fi
+
+	OLDFILE='/etc/apt/sources.old'
+
+	if [[ ! -f $OLDFILE ]]; then
+		cp $SOURCES $OLDFILE
+	fi
+
+	cat <<- EOT >> $SOURCES
+
+		deb     http://deb.debian.org/debian               unstable          main contrib non-free
+		deb-src http://deb.debian.org/debian               unstable          main contrib non-free
+	EOT
+
+	cat <<- EOT > /etc/apt/preferences.d/debian-unstable
+		Package: *
+		Pin: release n=unstable
+		Pin-Priority: 50
+	EOT
+
+	apt update
+fi
+
+#####################################################################
+#####################################################################
 if [[ ! -z "$DO_VISUDO" ]]; then
 	createSudoer "main-cmds" <<- EOT
-	Cmnd_Alias SHUTDOWN_CMDS = /sbin/poweroff, /sbin/reboot, /sbin/halt
-	Cmnd_Alias NETZWORK_CMDS = /usr/sbin/tunctl, /sbin/ifconfig, /usr/sbin/brctl, /sbin/ip
-	Cmnd_Alias PRINTING_CMDS = /usr/sbin/lpc, /usr/sbin/lprm
-	$SUDO_USER ALL= NOPASSWD: SHUTDOWN_CMDS
-	$SUDO_USER ALL= NOPASSWD: NETZWORK_CMDS
-	ALL ALL=(ALL) NOPASSWD: PRINTING_CMDS
-	# Cmnd_Alias ADMIN_CMDS = /usr/sbin/passwd, /usr/sbin/useradd, /usr/sbin/userdel, /usr/sbin/usermod, /usr/sbin/visudo
-	# $SUDO_USER ALL= ADMIN_CMDS
-	# USERS WORKSTATIONS=(ADMINS) ADMIN_CMDS
+		Cmnd_Alias SHUTDOWN_CMDS = /sbin/poweroff, /sbin/reboot, /sbin/halt
+		Cmnd_Alias NETZWORK_CMDS = /usr/sbin/tunctl, /sbin/ifconfig, /usr/sbin/brctl, /sbin/ip
+		Cmnd_Alias PRINTING_CMDS = /usr/sbin/lpc, /usr/sbin/lprm
+		$SUDO_USER ALL= NOPASSWD: SHUTDOWN_CMDS
+		$SUDO_USER ALL= NOPASSWD: NETZWORK_CMDS
+		ALL ALL=(ALL) NOPASSWD: PRINTING_CMDS
+		# Cmnd_Alias ADMIN_CMDS = /usr/sbin/passwd, /usr/sbin/useradd, /usr/sbin/userdel, /usr/sbin/usermod, /usr/sbin/visudo
+		# $SUDO_USER ALL= ADMIN_CMDS
+		# USERS WORKSTATIONS=(ADMINS) ADMIN_CMDS
 	EOT
 fi
 
@@ -467,6 +520,9 @@ if [[ ! -z "$DO_TOOLS" ]]; then
 	addSudoComplete '.profile'
 
 	#sudo -u $SUDO_USER echo 'source ~/.profile' >> .bashrc # already read by bash
+	if [[ ! -z ".zshrc" ]]; then
+		addCommand '.zshrc' 'source ~/.profile'
+	fi
 fi
 
 #####################################################################
@@ -527,7 +583,7 @@ if [[ ! -z "$DO_NVIDIA" ]]; then
 			# official nvidia.com package step 2
 			apt remove --purge '^nvidia.*'
 
-			sh $NVIDIA_DRV  # execute NVIDIA-Linux-x86_64-*.run
+			sh $NVIDIA_DRV --no-unified-memory # execute NVIDIA-Linux-x86_64-*.run
 
 			apt install mesa-vulkan-drivers mesa-vulkan-drivers:i386
 			apt install libvulkan1 libvulkan1:i386
@@ -538,8 +594,8 @@ if [[ ! -z "$DO_NVIDIA" ]]; then
 		else
 			# official nvidia.com package step 1
 			cat <<- EOT > /etc/modprobe.d/blacklist-nvidia-nouveau.conf
-			blacklist nouveau
-			options nouveau modeset=0
+				blacklist nouveau
+				options nouveau modeset=0
 			EOT
 
 			update-initramfs -u
@@ -609,40 +665,40 @@ if [[ ! -z "$DO_SSH_AGENT" ]]; then
 		if ! grep -F -q 'start_agent()' $1 ; then
 			cat <<- 'EOT' | sudo -u $SUDO_USER tee -a $1 > /dev/null
 
-			SSH_ENV=$HOME/.ssh/environment
+				SSH_ENV=$HOME/.ssh/environment
 
-			function start_agent() {
-			  echo "Initializing new SSH agent ..."
-			  bash -c ssh-agent -c | sed 's/^echo/#echo/' > $SSH_ENV
-			  echo "succeeded"
-			  chmod 600 $SSH_ENV
-			  . $SSH_ENV > /dev/null
-			  ssh-add $HOME/.ssh/id_rsa
-			  ssh-add $HOME/.ssh/git_rsa
-			}
+				function start_agent() {
+				  echo "Initializing new SSH agent ..."
+				  bash -c ssh-agent -c | sed 's/^echo/#echo/' > $SSH_ENV
+				  echo "succeeded"
+				  chmod 600 $SSH_ENV
+				  . $SSH_ENV > /dev/null
+				  ssh-add $HOME/.ssh/id_rsa
+				  ssh-add $HOME/.ssh/git_rsa
+				}
 
-			function test_identities() {
-			  if ssh-add -l | grep "The agent has no identities" > /dev/null; then
-			    if ! ssh-add; then
-			      start_agent
-			    fi
-			  fi
-			}
+				function test_identities() {
+				  if ssh-add -l | grep "The agent has no identities" > /dev/null; then
+				    if ! ssh-add; then
+				      start_agent
+				    fi
+				  fi
+				}
 
-			if [ -n "$SSH_AGENT_PID" ]; then
-			  if ps -ef | grep $SSH_AGENT_PID | grep ssh-agent > /dev/null; then
-			    test_identities
-			  fi
-			else
-			  if [ -f $SSH_ENV ]; then
-			    . $SSH_ENV > /dev/null
-			  fi
-			  if ps -ef | grep $SSH_AGENT_PID | grep -v grep | grep ssh-agent > /dev/null; then
-			    test_identities
-			  else
-			    start_agent
-			  fi
-			fi
+				if [ -n "$SSH_AGENT_PID" ]; then
+				  if ps -ef | grep $SSH_AGENT_PID | grep ssh-agent > /dev/null; then
+				    test_identities
+				  fi
+				else
+				  if [ -f $SSH_ENV ]; then
+				    . $SSH_ENV > /dev/null
+				  fi
+				  if ps -ef | grep $SSH_AGENT_PID | grep -v grep | grep ssh-agent > /dev/null; then
+				    test_identities
+				  else
+				    start_agent
+				  fi
+				fi
 			EOT
 		fi
 	}
@@ -673,11 +729,11 @@ if [[ ! -z "$DO_KVM" ]]; then
 	#  rulePath='/etc/polkit-1/rules.d/49-polkit-pkla-compat.rules'
 		local rulePath='/etc/polkit-1/rules.d/50-libvirt.rules'
 		cat <<- 'EOT' | sudo -u $SUDO_USER tee $rulePath > /dev/null
-		polkit.addRule(function(action, subject) {
-		  if (action.id == 'org.libvirt.unix.manage' && subject.isInGroup('kvm')) {
-		    return polkit.Result.YES;
-		  }
-		});
+			polkit.addRule(function(action, subject) {
+			  if (action.id == 'org.libvirt.unix.manage' && subject.isInGroup('kvm')) {
+			    return polkit.Result.YES;
+			  }
+			});
 		EOT
 
 		virsh pool-list --all
@@ -688,27 +744,27 @@ if [[ ! -z "$DO_KVM" ]]; then
 		local thePort=$2
 
 		cat <<- EOT > "/etc/network/interfaces.d/$theBridge"
-		# The primary network interface
-		auto $thePort
-		iface $thePort inet manual
+			# The primary network interface
+			auto $thePort
+			iface $thePort inet manual
 
-		auto $theBridge
-		# Configure bridge and give it a dhcp ip
-		#iface $theBridge inet dhcp
-		# Configure bridge and give it a static ip
-		iface $theBridge inet static
-		  address         192.168.0.20
-		  broadcast       192.168.0.255
-		  netmask         255.255.255.0
-		  gateway         192.168.0.1
-		  dns-nameservers 192.168.0.1
-		  dns-search      192.168.0.1
-		  bridge_ports    $thePort
-		  bridge_stp      off
-		  bridge_fd       0
-		  bridge_maxwait  5
-		  bridge_maxage   12
-		  bridge_waitport 0
+			auto $theBridge
+			# Configure bridge and give it a dhcp ip
+			#iface $theBridge inet dhcp
+			# Configure bridge and give it a static ip
+			iface $theBridge inet static
+			  address         $THIS_IP
+			  broadcast       192.168.0.255
+			  netmask         255.255.255.0
+			  gateway         $THIS_DEF
+			  dns-nameservers $THIS_DNS
+			  dns-search      $THIS_NAME.$THIS_DOMAIN
+			  bridge_ports    $thePort
+			  bridge_stp      off
+			  bridge_fd       0
+			  bridge_maxwait  5
+			  bridge_maxage   12
+			  bridge_waitport 0
 		EOT
 
 		systemctl restart libvirtd
@@ -720,11 +776,11 @@ if [[ ! -z "$DO_KVM" ]]; then
 		local activeBridge="/tmp/activate-$theBridge.yaml"
 
 		cat <<- EOT | sudo -u $SUDO_USER tee "$activeBridge" > /dev/null
-		<network>
-		  <name>$theBridge</name>
-		  <forward mode="bridge"/>
-		  <bridge name="$theBridge"/>
-		</network>
+			<network>
+			  <name>$theBridge</name>
+			  <forward mode="bridge"/>
+			  <bridge name="$theBridge"/>
+			</network>
 		EOT
 
 		virsh -c qemu:///system net-define    --file "$activeBridge"
@@ -1004,7 +1060,7 @@ if [[ ! -z "$DO_VIRTUAL_BOX" ]]; then
 #  dpkg -i virtualbox-qt_6.1.0-dfsg-2_amd64.deb
 #  dpkg -i virtualbox-ext-pack_6.1.0-1_all.deb
 
-#  addPgpKey 'https://www.virtualbox.org/download/oracle_vbox_2016.asc' 'oracle.gpg'
+#  addPgpKey 'oracle.gpg' 'https://www.virtualbox.org/download/oracle_vbox_2016.asc'
 #  echo 'deb https://download.virtualbox.org/virtualbox/debian buster contrib' > $SOURCES_DIR/virtualbox.list
 #  apt update
 
@@ -1086,7 +1142,7 @@ if [[ ! -z "$DO_WINE" ]]; then
 	# not at latest debian testing
 	# repositories and images created with the Open Build Service
 	# OBS_URL='https://download.opensuse.org/repositories/Emulators:/Wine:/Debian/Debian_Testing_standard'
-	# addPgpKey "https://$OBS_URL/Release.key" 'wine.gpg'
+	# addPgpKey 'wine.gpg' "https://$OBS_URL/Release.key"
 	# echo 'deb http://$OBS_URL ./' > $SOURCES_DIR/wine-obs.list
 	# apt update
 
@@ -1105,7 +1161,7 @@ if [[ ! -z "$DO_WINE" ]]; then
 	# winehq-devel:     Developer builds are in-development, cutting edge versions.
 
 	WINE_BUILDS='https://dl.winehq.org/wine-builds'
-	addPgpKey "$WINE_BUILDS/winehq.key" 'wineHQ.gpg'
+	addPgpKey 'wineHQ.gpg' "$WINE_BUILDS/winehq.key"
 	echo "deb $WINE_BUILDS/debian/ bullseye main" > $SOURCES_DIR/wine.list
 	# echo "deb $WINE_BUILDS/debian/ testing  main" > $SOURCES_DIR/wine.list # <-- broken, not working
 	apt update
@@ -1162,11 +1218,11 @@ fi
 if [[ ! -z "$DO_STEAM" ]]; then
 	echo '######### install Steam'
 	STEAM_BUILDS='https://repo.steampowered.com/steam'
-#	addPgpKey "$STEAM_BUILDS/archive/stable/steam.gpg" 'steam.gpg'
-	addPgpKey "$STEAM_BUILDS/archive/precise/steam.gpg" 'steam.gpg'
+#	addPgpKey 'steam.gpg' "$STEAM_BUILDS/archive/stable/steam.gpg"
+	addPgpKey 'steam.gpg' "$STEAM_BUILDS/archive/precise/steam.gpg"
 	cat <<- EOT > $SOURCES_DIR/steam.list
-	deb     [arch=amd64,i386] $STEAM_BUILDS stable steam
-	deb-src [arch=amd64,i386] $STEAM_BUILDS stable steam
+		deb     [arch=amd64,i386] $STEAM_BUILDS stable steam
+		deb-src [arch=amd64,i386] $STEAM_BUILDS stable steam
 	EOT
 
 	apt update
@@ -1187,7 +1243,7 @@ fi
 if [[ ! -z "$DO_LUTRIS" ]]; then
 	echo '######### install Lutris'
 	LUTRIS_URL='https://download.opensuse.org/repositories/home:/strycore/Debian_Testing'
-	addPgpKey "$LUTRIS_URL/Release.key" 'lutris.gpg'
+	addPgpKey 'lutris.gpg' "$LUTRIS_URL/Release.key"
 	echo "deb $LUTRIS_URL/ ./" > $SOURCES_DIR/lutris.list
 	apt update
 	apt install lutris
@@ -1228,15 +1284,18 @@ if [[ ! -z "$DO_JAVA" ]]; then
 	apt install default-jre
 	apt install default-jdk
 
+	apt install openjdk-15-jdk
+	apt install openjdk-8-jdk
+
 	# https://www.oracle.com/java/technologies/javase-jdk8-downloads.html
 	# apt install oracle-java8-installer
 
 	JFROG_BUILDS='https://adoptopenjdk.jfrog.io/adoptopenjdk'
-	addPgpKey "$JFROG_BUILDS/api/gpg/key/public" 'jfrog.gpg'
+	addPgpKey 'jfrog.gpg' "$JFROG_BUILDS/api/gpg/key/public"
 	echo "deb $JFROG_BUILDS/deb/ buster main" > $SOURCES_DIR/jfrog.list
 	apt update
 
-	apt install "adoptopenjdk-14-hotspot"
+	apt install "adoptopenjdk-15-hotspot"
 	apt install "adoptopenjdk-8-hotspot"
 #  apt install "adoptopenjdk-8-hotspot-jre"
 #  apt install" adoptopenjdk-8-openj9-jre"
@@ -1349,18 +1408,18 @@ if [[ ! -z "$DO_MOZILLA" ]]; then
 
 		if [[ ! -f "$profileINI" ]]; then
 			cat <<- EOT | sudo -u $SUDO_USER tee $profileINI > /dev/null
-			[General]
-			StartWithLastProfile=0
-			Version=2
+				[General]
+				StartWithLastProfile=0
+				Version=2
 			EOT
 		fi
 		sudo -u $SUDO_USER sed -i '0,/StartWithLastProfile=[0-9]*/s//StartWithLastProfile=0/' $profileINI
 		if ! grep -F -q 'win10profile' $profileINI ; then
 			cat <<- EOT | sudo -u $SUDO_USER tee -a $profileINI > /dev/null
-			[Profile1]
-			Name=win10profile
-			IsRelative=1
-			Path=win10profile
+				[Profile1]
+				Name=win10profile
+				IsRelative=1
+				Path=win10profile
 			EOT
 		fi
 	}
@@ -1388,7 +1447,7 @@ fi
 if [[ ! -z "$DO_SPOTIFY" ]]; then
 	echo '######### install Spotify'
 
-	addPgpKey 'https://download.spotify.com/debian/pubkey.gpg' 'spotify.gpg'
+	addPgpKey 'spotify.gpg' 'https://download.spotify.com/debian/pubkey.gpg'
 #	echo deb 'https://repository.spotify.com stable non-free' > $SOURCES_DIR/spotify.list
 	echo deb 'https://repository.scdn.co stable non-free' > $SOURCES_DIR/spotify.list
 	apt update
@@ -1401,13 +1460,14 @@ fi
 ######### twitch gui
 # https://github.com/streamlink/streamlink-twitch-gui
 # https://www.hiroom2.com/2018/05/27/ubuntu-1804-twitch-en/
+# --twitch-disable-ads --twitch-low-latency --hls-live-edge=2 --hls-segment-stream-data --hls-segment-threads=4 --stream-segment-threads=4 --retry-streams 10 --retry-max 100 --retry-open 10 --default-stream "best,720p,480p,worst"
 if [[ ! -z "$DO_TWITCH_GUI" ]]; then
 	echo '######### install Streamlink'
 	apt install streamlink
 
 	echo '######### install twitch gui'
 	TWITCH_URL='https://github.com/streamlink/streamlink-twitch-gui/releases'
-	TWITCH_REL='v1.9.1'
+	TWITCH_REL='v1.11.0'
 	TWITCH_DEF="streamlink-twitch-gui-${TWITCH_REL}-linux64.tar.gz"
 	TWITCH_SRC='streamlink-twitch-gui-*-linux64.tar.gz'
 	TWITCH_DRV=$(downloadDriver $TWITCH_URL $TWITCH_URL/download/$TWITCH_REL/$TWITCH_DEF $TWITCH_SRC)
@@ -1416,6 +1476,19 @@ if [[ ! -z "$DO_TWITCH_GUI" ]]; then
 	apt install xdg-utils libgconf-2-4
 	/opt/streamlink-twitch-gui/add-menuitem.sh
 	ln -s /opt/streamlink-twitch-gui/start.sh /usr/bin/streamlink-twitch-gui
+
+	createDesktopEntry "streamlink.desktop" <<- EOT
+		[Desktop Entry]
+		Version=1.0
+		Name=Streamlink Twitch GUI
+		Comment=Browse Twitch.tv and watch streams in your videoplayer of choice
+		Exec=/opt/streamlink-twitch-gui/streamlink-twitch-gui --twitch-disable-ads --twitch-low-latency --hls-live-edge=2 --hls-segment-stream-data --hls-segment-threads=4 --stream-segment-threads=4 --retry-streams 10 --retry-max 100 --retry-open 10 --default-stream "best,720p,480p,worst"
+		Icon=streamlink-twitch-gui.png
+		Terminal=false
+		Type=Application
+		Categories=Utility;Internet;Video;
+		StartupNotify=true
+	EOT
 fi
 
 #####################################################################
@@ -1498,7 +1571,7 @@ fi
 if [[ ! -z "$DO_SUBLIME" ]]; then
 	echo '######### install Sublime editor'
 
-	addPgpKey 'https://download.sublimetext.com/sublimehq-pub.gpg' 'sublime.gpg'
+	addPgpKey 'sublime.gpg' 'https://download.sublimetext.com/sublimehq-pub.gpg'
 	echo 'deb https://download.sublimetext.com/ apt/stable/' > $SOURCES_DIR/sublime.list
 	apt update
 
@@ -1507,16 +1580,16 @@ if [[ ! -z "$DO_SUBLIME" ]]; then
 	ln -s /opt/sublime_text/sublime_text /usr/bin/sublime_text
 
 	createDesktopEntry "sublime.desktop" <<- EOT
-	[Desktop Entry]
-	Version=1.0
-	Name=Sublime
-	Comment=a cross-platform text editor
-	Exec=/opt/sublime_text/sublime_text %F
-	Icon=sublime-text.png
-	Terminal=false
-	Type=Application
-	Categories=Utility;Application;Editor;
-	StartupNotify=true
+		[Desktop Entry]
+		Version=1.0
+		Name=Sublime
+		Comment=a cross-platform text editor
+		Exec=/opt/sublime_text/sublime_text %F
+		Icon=sublime-text.png
+		Terminal=false
+		Type=Application
+		Categories=Utility;Application;Editor;
+		StartupNotify=true
 	EOT
 
 	if [[ -d "Downloads/sublime/User" ]]; then
@@ -1541,16 +1614,16 @@ if [[ ! -z "$DO_CUDA_TEXT" ]]; then
 	dpkg -i $CUDA_DEB
 
 	createDesktopEntry "cudatext.desktop" <<- EOT
-	[Desktop Entry]
-	Version=1.0
-	Name=Cuda Text
-	Comment=a cross-platform text editor
-	Exec=cudatext
-	Icon=cudatext-512.png
-	Terminal=false
-	Type=Application
-	Categories=Utility;Application;Editor;
-	StartupNotify=true
+		[Desktop Entry]
+		Version=1.0
+		Name=Cuda Text
+		Comment=a cross-platform text editor
+		Exec=cudatext
+		Icon=cudatext-512.png
+		Terminal=false
+		Type=Application
+		Categories=Utility;Application;Editor;
+		StartupNotify=true
 	EOT
 
 	PHYLIB=$(find /usr -name 'libpython3.*so*' 2>/dev/null | head -1)
@@ -1559,23 +1632,23 @@ if [[ ! -z "$DO_CUDA_TEXT" ]]; then
 	sudo -u $SUDO_USER mkdir -p "$CUDA_SETTING"
 
 	cat <<- 'EOT' | sudo -u $SUDO_USER tee "$CUDA_SETTING/user.json" > /dev/null
-	{
-	  "auto_close_brackets": "([{\"'",
-	  "font_name__linux": "Monospace",
-	  "font_size__linux": 10,
-	  "indent_size": 2,
-	  "numbers_show": false,
-	  "pylib__linux": "$(basename $PHYLIB)",
-	  "saving_force_final_eol": true,
-	  "saving_trim_spaces": true,
-	  "tab_size": 4,
-	  "ui_one_instance": true,
-	  "ui_reopen_session": false,
-	  "ui_sidebar_show": false,
-	  "ui_theme": "ebony",
-	  "ui_theme_syntax": "ebony",
-	  "ui_toolbar_show": true,
-	}
+		{
+		  "auto_close_brackets": "([{\"'",
+		  "font_name__linux": "Monospace",
+		  "font_size__linux": 10,
+		  "indent_size": 2,
+		  "numbers_show": false,
+		  "pylib__linux": "$(basename $PHYLIB)",
+		  "saving_force_final_eol": true,
+		  "saving_trim_spaces": true,
+		  "tab_size": 4,
+		  "ui_one_instance": true,
+		  "ui_reopen_session": false,
+		  "ui_sidebar_show": false,
+		  "ui_theme": "ebony",
+		  "ui_theme_syntax": "ebony",
+		  "ui_toolbar_show": true,
+		}
 	EOT
 
 	find /usr -name 'libpython3.*so*' 2>/dev/null
@@ -1655,13 +1728,13 @@ if [[ ! -z "$DO_SAMBA" ]]; then
 		local smbUser=$1
 		if ! grep -F -q "[$smbUser]" $SAMBA_CONF ; then
 			cat <<- EOT >> $SAMBA_CONF
-			[$smbUser]
-			  path = $SAMBA_SHARE/$smbUser
-			  read only = no
-			  browseable = $2
-			  force create mode = 0660
-			  force directory mode = 2770
-			  valid users = @$smbUser @sambashare
+				[$smbUser]
+				  path = $SAMBA_SHARE/$smbUser
+				  read only = no
+				  browseable = $2
+				  force create mode = 0660
+				  force directory mode = 2770
+				  valid users = @$smbUser @sambashare
 			EOT
 		fi
 	}
@@ -1677,13 +1750,13 @@ if [[ ! -z "$DO_SAMBA" ]]; then
 
 	if ! grep -F -q '[Docs]' $SAMBA_CONF ; then
 		cat <<- EOT >> $SAMBA_CONF
-		[Docs]
-		  path = $SAMBA_SHARE
-		  writable = yes
-		  guest ok = yes
-		  guest only = yes
-		  create mode = 0777
-		  directory mode = 0777
+			[Docs]
+			  path = $SAMBA_SHARE
+			  writable = yes
+			  guest ok = yes
+			  guest only = yes
+			  create mode = 0777
+			  directory mode = 0777
 		EOT
 	fi
 
@@ -1738,9 +1811,9 @@ if [[ ! -z "$DO_CIFS" ]]; then
 
 	WIN_CREDENTIALS='/etc/win-credentials'
 	cat <<- EOT > $WIN_CREDENTIALS
-	username=$WIN_USER
-	password=$WIN_PASSWORD
-	domain=$WIN_DOMAIN
+		username=$WIN_USER
+		password=$WIN_PASSWORD
+		domain=$WIN_DOMAIN
 	EOT
 	chown root:root $WIN_CREDENTIALS
 	chmod 600 $WIN_CREDENTIALS
@@ -1758,35 +1831,35 @@ if [[ ! -z "$DO_CIFS" ]]; then
 			cp /etc/fstab /etc/fstab.old
 		fi
 		cat <<- EOT >> /etc/fstab
-		//$WIN_DOMAIN/c  /mnt/work_c  cifs  credentials=$WIN_CREDENTIALS,$WIN_OPTIONS 0 0
-		//$WIN_DOMAIN/d  /mnt/work_d  cifs  credentials=$WIN_CREDENTIALS,$WIN_OPTIONS 0 0
-		//$WIN_DOMAIN/e  /mnt/work_e  cifs  credentials=$WIN_CREDENTIALS,$WIN_OPTIONS 0 0
+			//$WIN_DOMAIN/c  /mnt/work_c  cifs  credentials=$WIN_CREDENTIALS,$WIN_OPTIONS 0 0
+			//$WIN_DOMAIN/d  /mnt/work_d  cifs  credentials=$WIN_CREDENTIALS,$WIN_OPTIONS 0 0
+			//$WIN_DOMAIN/e  /mnt/work_e  cifs  credentials=$WIN_CREDENTIALS,$WIN_OPTIONS 0 0
 		EOT
 	fi
 
 	WIN_SHELL="/mnt/mount-win.sh"
 	cat <<- EOT > "$WIN_SHELL"
-	#!/bin/bash
-	mount //$WIN_DOMAIN/c
-	mount //$WIN_DOMAIN/d
-	mount //$WIN_DOMAIN/e
+		#!/bin/bash
+		mount //$WIN_DOMAIN/c
+		mount //$WIN_DOMAIN/d
+		mount //$WIN_DOMAIN/e
 	EOT
 	chmod +x $WIN_SHELL
 
 	createDesktopEntry "windows.desktop" <<- EOT
-	[Desktop Entry]
-	Name=Windows Shares
-	Comment=mount windows folder
-	Exec=bash -c "sudo $WIN_SHELL > /dev/null 2>&1 & xdg-open /mnt/work_c"
-	Icon=drive-removable-media
-	Terminal=false
-	Type=Application
-	Categories=System;Utility;FileTools;FileManager;
-	StartupNotify=true
+		[Desktop Entry]
+		Name=Windows Shares
+		Comment=mount windows folder
+		Exec=bash -c "sudo $WIN_SHELL > /dev/null 2>&1 & xdg-open /mnt/work_c"
+		Icon=drive-removable-media
+		Terminal=false
+		Type=Application
+		Categories=System;Utility;FileTools;FileManager;
+		StartupNotify=true
 	EOT
 
 	createSudoer "win-cmds" <<- EOT
-	$SUDO_USER ALL= NOPASSWD: $WIN_SHELL
+		$SUDO_USER ALL= NOPASSWD: $WIN_SHELL
 	EOT
 
 	df -h
@@ -1797,7 +1870,7 @@ fi
 if [[ ! -z "$DO_CIFS_KVM" ]]; then
 	echo '######### install Access Windows Share to KVM client'
 
-	WIN_DOMAIN_KVM="win10.local"
+	WIN_DOMAIN_KVM="win10.$THIS_DOMAIN"
 
 	echo "used windows domain: $WIN_DOMAIN_KVM"
 	echo "used windows user: $WIN_USER"
@@ -1816,9 +1889,9 @@ if [[ ! -z "$DO_CIFS_KVM" ]]; then
 
 	WIN_CREDENTIALS_KVM='/etc/win-credentials-kvm'
 	cat <<- EOT > $WIN_CREDENTIALS_KVM
-	username=$WIN_USER
-	password=$WIN_PASSWORD_KVM
-	domain=$WIN_DOMAIN_KVM
+		username=$WIN_USER
+		password=$WIN_PASSWORD_KVM
+		domain=$WIN_DOMAIN_KVM
 	EOT
 	chown root:root $WIN_CREDENTIALS_KVM
 	chmod 600 $WIN_CREDENTIALS_KVM
@@ -1834,31 +1907,31 @@ if [[ ! -z "$DO_CIFS_KVM" ]]; then
 			cp /etc/fstab /etc/fstab.old
 		fi
 		cat <<- EOT >> /etc/fstab
-		//$WIN_DOMAIN_KVM/c  /mnt/win10_c  cifs  credentials=$WIN_CREDENTIALS_KVM,$WIN_OPTIONS 0 0
+			//$WIN_DOMAIN_KVM/c  /mnt/win10_c  cifs  credentials=$WIN_CREDENTIALS_KVM,$WIN_OPTIONS 0 0
 		EOT
 	fi
 
 	WIN_SHELL_KVM="/mnt/mount-win-kvm.sh"
 	cat <<- EOT > "$WIN_SHELL_KVM"
-	#!/bin/bash
-	mount //$WIN_DOMAIN_KVM/c
+		#!/bin/bash
+		mount //$WIN_DOMAIN_KVM/c
 	EOT
 	chmod +x $WIN_SHELL_KVM
 
 	createDesktopEntry "windows.kvm.desktop" <<- EOT
-	[Desktop Entry]
-	Name=Windows Shares
-	Comment=mount windows folder
-	Exec=bash -c "sudo $WIN_SHELL_KVM > /dev/null 2>&1 & xdg-open /mnt/win10_c"
-	Icon=drive-removable-media
-	Terminal=false
-	Type=Application
-	Categories=System;Utility;FileTools;FileManager;
-	StartupNotify=true
+		[Desktop Entry]
+		Name=Windows Shares
+		Comment=mount windows folder
+		Exec=bash -c "sudo $WIN_SHELL_KVM > /dev/null 2>&1 & xdg-open /mnt/win10_c"
+		Icon=drive-removable-media
+		Terminal=false
+		Type=Application
+		Categories=System;Utility;FileTools;FileManager;
+		StartupNotify=true
 	EOT
 
 	createSudoer "win-cmds-kvm" <<- EOT
-	$SUDO_USER ALL= NOPASSWD: $WIN_SHELL_KVM
+		$SUDO_USER ALL= NOPASSWD: $WIN_SHELL_KVM
 	EOT
 
 	df -h
@@ -1886,6 +1959,19 @@ fi
 if [[ ! -z "$DO_VIEWNIOR" ]]; then
 	echo '######### install Viewnior'
 	apt install viewnior
+fi
+
+#####################################################################
+#####################################################################
+######### Viewnior image viewer
+if [[ ! -z "$DO_ETCHER" ]]; then
+	echo '######### install Etcher.io'
+
+	addPgpKey 'etcher.gpg' 'hkps://keyserver.ubuntu.com:443' '379CE192D401AB61'
+	echo "deb 'https://deb.etcher.io' stable etcher" > $SOURCES_DIR/etcher.list
+
+	apt update
+	apt install balena-etcher-electron
 fi
 
 #####################################################################
@@ -1932,6 +2018,10 @@ fi
 if [[ ! -z "$DO_TEST" ]]; then
 	echo 'nothing here for now'
 
+	cat <<- EOT > '/tmp/test.txt'
+		game       IN A 192.168.0.20
+		work       IN A 192.168.0.30
+	EOT
 #	isoInstallWindows10 $BRIDGE
 
 fi

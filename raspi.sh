@@ -65,23 +65,17 @@ while [[ $# -gt 0 ]]; do
 	shift
 done
 
-RASP_NAME=rasp1
-RASP_IP=192.168.0.10
-RASP_DEF=192.168.0.1
+THIS_NAME=rasp1
+THIS_IP=192.168.0.10
+THIS_DEF=192.168.0.1
+THIS_DOMAIN=at-home
 
 MY_DOMAIN=imhaus.ddns.net
 
-SOURCES_DIR=/etc/apt/sources.list.d
 SUDO_USER=$(logname)
-HOME_USER=/home/$SUDO_USER
-cd $HOME_USER
+HOME_USER="/home/$SUDO_USER"
 
-function logoutNow() {
-	echo
-	echo -n 'You need to logout now!'
-	read
-	exit
-}
+cd $HOME_USER
 
 if [[ $(id -u) != 0 ]]; then
 	 echo
@@ -92,6 +86,13 @@ fi
 #####################################################################
 ## some functions
 #####################################################################
+function logoutNow() {
+	echo
+	echo -n 'You need to logout now!'
+	read
+	exit
+}
+
 function continueNow() {
 	echo
 	echo -n "$1 (Y/n)!"
@@ -125,20 +126,20 @@ function insertPathFkts() {
 	if ! grep -F -q 'path_add()' $1 ; then
 		cat <<- 'EOT' | sudo -u $SUDO_USER tee -a $1 > /dev/null
 
-		path_add() {
-		  NEW_ELEMENT=${1%/}
-		  if [ -d "$1" ] && ! echo $PATH | grep -E -q "(^|:)$NEW_ELEMENT(:|$)" ; then
-		    if [ "$2" = "after" ] ; then
-		      PATH="$PATH:$NEW_ELEMENT"
-		    else
-		      PATH="$NEW_ELEMENT:$PATH"
-		    fi
-		  fi
-		}
+			path_add() {
+			  NEW_ELEMENT=${1%/}
+			  if [ -d "$1" ] && ! echo $PATH | grep -E -q "(^|:)$NEW_ELEMENT(:|$)" ; then
+			    if [ "$2" = "after" ] ; then
+			      PATH="$PATH:$NEW_ELEMENT"
+			    else
+			      PATH="$NEW_ELEMENT:$PATH"
+			    fi
+			  fi
+			}
 
-		path_rm() {
-		  PATH="$(echo $PATH | sed -e 's;\(^\|:\)${1%/}\(:\|\$\);\1\2;g' -e 's;^:\|:$;;g' -e 's;::;:;g')"
-		}
+			path_rm() {
+			  PATH="$(echo $PATH | sed -e 's;\(^\|:\)${1%/}\(:\|\$\);\1\2;g' -e 's;^:\|:$;;g' -e 's;::;:;g')"
+			}
 		EOT
 		# dont forget 'export PATH'
 	fi
@@ -149,12 +150,12 @@ function insertGenPasswdFkt() {
 	if ! grep -F -q 'genpasswd()' $1 ; then
 		cat <<- 'EOT' | sudo -u $SUDO_USER tee -a $1 > /dev/null
 
-		genpasswd() {
-		  local l=$1
-		  if [ "$l" == "" ] && l=20 ; then
-		    tr -dc A-Za-z0-9_ < /dev/urandom | head -c ${l} | xargs
-		  fi
-		}
+			genpasswd() {
+			  local l=$1
+			  if [ "$l" == "" ] && l=20 ; then
+			    tr -dc A-Za-z0-9_ < /dev/urandom | head -c ${l} | xargs
+			  fi
+			}
 		EOT
 	fi
 }
@@ -168,8 +169,8 @@ function addBinToPath() {
 		echo "add '$2' to '$1'"
 		cat <<- EOT | sudo -u $SUDO_USER tee -a $1 > /dev/null
 
-		$addPathStr after
-		export PATH
+			$addPathStr after
+			export PATH
 		EOT
 	else
 		echo "'$1' already contain '$addPathStr'!"
@@ -185,7 +186,7 @@ function addExportEnv() {
 		echo "add '$exportStr' to '$1'"
 		cat <<- EOT | sudo -u $SUDO_USER tee -a $1 > /dev/null
 
-		$exportStr
+			$exportStr
 		EOT
 	else
 		echo "'$1' already contain '$exportStr'!"
@@ -195,9 +196,9 @@ function addExportEnv() {
 function addSudoComplete() {
 	if ! grep -F -q 'complete -cf sudo' $1 ; then
 		cat <<- 'EOT' | sudo -u $SUDO_USER tee -a $1 > /dev/null
-		if [ "$PS1" ]; then
-		  complete -cf sudo
-		fi
+			if [ "$PS1" ]; then
+			  complete -cf sudo
+			fi
 		EOT
 	fi
 
@@ -341,54 +342,54 @@ if [[ ! -z "$DO_SSH" ]]; then
 	fi
 
 	cat <<- EOT > $SSH_CONF
-	Port $SSH_PORT
-	AddressFamily any
-	Protocol 2
+		Port $SSH_PORT
+		AddressFamily any
+		Protocol 2
 
-	HostKey /etc/ssh/ssh_host_ed25519_key
-	HostKey /etc/ssh/ssh_host_rsa_key
+		HostKey /etc/ssh/ssh_host_ed25519_key
+		HostKey /etc/ssh/ssh_host_rsa_key
 
-	UsePrivilegeSeparation yes
+		UsePrivilegeSeparation yes
 
-	SyslogFacility AUTH
-	LogLevel VERBOSE
+		SyslogFacility AUTH
+		LogLevel VERBOSE
 
-	LoginGraceTime 30
-	PermitRootLogin no
-	StrictModes yes
+		LoginGraceTime 30
+		PermitRootLogin no
+		StrictModes yes
 
-	AuthenticationMethods publickey
-	AuthorizedKeysFile %h/.ssh/authorized_keys
-	PubkeyAuthentication yes
+		AuthenticationMethods publickey
+		AuthorizedKeysFile %h/.ssh/authorized_keys
+		PubkeyAuthentication yes
 
-	ChallengeResponseAuthentication no
-	HostbasedAuthentication no
-	PasswordAuthentication no
-	PermitEmptyPasswords no
+		ChallengeResponseAuthentication no
+		HostbasedAuthentication no
+		PasswordAuthentication no
+		PermitEmptyPasswords no
 
-	ClientAliveCountMax 3
-	ClientAliveInterval 3600
-	MaxAuthTries 3
-	MaxStartups 3:50:6
-	PrintLastLog yes
-	PrintMotd no
-	TCPKeepAlive yes
-	X11Forwarding no
-	X11DisplayOffset 10
+		ClientAliveCountMax 3
+		ClientAliveInterval 3600
+		MaxAuthTries 3
+		MaxStartups 3:50:6
+		PrintLastLog yes
+		PrintMotd no
+		TCPKeepAlive yes
+		X11Forwarding no
+		X11DisplayOffset 10
 
-	#Banner /etc/issue.net
-	AcceptEnv LANG LC_*
-	Subsystem sftp /usr/lib/ssh/sftp-server -f AUTHPRIV -l INFO
-	UsePAM yes
+		#Banner /etc/issue.net
+		AcceptEnv LANG LC_*
+		Subsystem sftp /usr/lib/ssh/sftp-server -f AUTHPRIV -l INFO
+		UsePAM yes
 
-	AllowGroups ssh
-	AllowUsers $SUDO_USER
-	Compression delayed
+		AllowGroups ssh
+		AllowUsers $SUDO_USER
+		Compression delayed
 
-	Ciphers chacha20-poly1305@openssh.com,aes256-gcm@openssh.com,aes128-gcm@openssh.com,aes256-ctr
-	HostKeyAlgorithms rsa-sha2-512,ssh-rsa,ssh-dss
-	KexAlgorithms curve25519-sha256@libssh.org,diffie-hellman-group-exchange-sha256
-	MACs hmac-sha2-512-etm@openssh.com,hmac-sha2-256-etm@openssh.com,hmac-sha2-512,hmac-sha2-256,umac-128-etm@openssh.com
+		Ciphers chacha20-poly1305@openssh.com,aes256-gcm@openssh.com,aes128-gcm@openssh.com,aes256-ctr
+		HostKeyAlgorithms rsa-sha2-512,ssh-rsa,ssh-dss
+		KexAlgorithms curve25519-sha256@libssh.org,diffie-hellman-group-exchange-sha256
+		MACs hmac-sha2-512-etm@openssh.com,hmac-sha2-256-etm@openssh.com,hmac-sha2-512,hmac-sha2-256,umac-128-etm@openssh.com
 	EOT
 
 	#F2B_CONF=/etc/fail2ban/jail.local
@@ -421,8 +422,8 @@ if [[ ! -z "$DO_SSH" ]]; then
 	iptables-save > $RULES_DST
 
 	cat <<- EOT > $RULES_BIN
-	#!/bin/sh
-	/sbin/iptables-restore < $RULES_DST
+		#!/bin/sh
+		/sbin/iptables-restore < $RULES_DST
 	EOT
 
 	chmod +x $RULES_BIN
@@ -434,14 +435,14 @@ if [[ ! -z "$DO_WLAN" ]]; then
 	WPA_CONF='wpa-supplicant.conf'
 
 	cat <<- 'EOT' > $WPA_CONF
-	country=DE
-	ctrl_interface=DIR=/var/run/wpa_supplicant GROUP=netdev
-	update_config=1
-	network={
-     ssid="Pfotenweg";
-     psk="bigmom86";
-     key_mgmt=WPA-PSK
-	}
+		country=DE
+		ctrl_interface=DIR=/var/run/wpa_supplicant GROUP=netdev
+		update_config=1
+		network={
+	     ssid="Pfotenweg";
+	     psk="bigmom86";
+	     key_mgmt=WPA-PSK
+		}
 	EOT
 
 fi
@@ -469,16 +470,16 @@ if [[ ! -z "$DO_BIND" ]]; then
 		local thePort=$1
 
 		cat <<- EOT > "/etc/network/interfaces.d/$thePort"
-		auto $thePort
+			auto $thePort
 
-		# The primary network interface
-		iface $thePort inet static
-		  address         $RASP_IP
-		  broadcast       192.168.0.255
-		  netmask         255.255.255.0
-		  gateway         $RASP_DEF
-		  dns-nameservers $RASP_IP
-		  dns-search      $RASP_IP
+			# The primary network interface
+			iface $thePort inet static
+			  address         $THIS_IP
+			  broadcast       192.168.0.255
+			  netmask         255.255.255.0
+			  gateway         $THIS_DEF
+			  dns-nameservers 127.0.0.1
+			  dns-search      $THIS_NAME.$THIS_DOMAIN
 		EOT
 	}
 
@@ -490,13 +491,15 @@ if [[ ! -z "$DO_BIND" ]]; then
 	if [[ ! -f "/etc/hostname.old" ]]; then
 		mv "/etc/hostname" "/etc/hostname.old"
 	fi
-	echo "$RASP_NAME" > /etc/hostname
+	echo "$THIS_NAME" > /etc/hostname
 
 	systemctl restart systemd-hostnamed
 	#/etc/init.d/hostname.sh restart		# old !!!
 
-	if ! grep -F -q "$RASP_NAME.local" /etc/hosts ; then
-		echo "127.0.0.1 $RASP_NAME.local $RASP_NAME" >> /etc/hosts
+	HOST_FILE='/etc/hosts'
+	if ! grep -F -q "$THIS_NAME.$THIS_DOMAIN" $HOST_FILE ; then
+		sed -i 's|^127.0.0.1|d' $HOST_FILE
+		echo "127.0.0.1 $THIS_NAME.$THIS_DOMAIN $THIS_NAME localhost" >> $HOST_FILE
 	fi
 
 	if [[ ! -f "/etc/host.conf.old" ]]; then
@@ -513,80 +516,80 @@ if [[ ! -z "$DO_BIND" ]]; then
 
 	# 217.0.43.161
 	# 217.0.43.177
-	cat <<- 'EOT' >> '/etc/bind/named.conf.options'
-	options {
-	  directory "/var/cache/bind";
-	  recursion yes;
-	  allow-query { "acl_trusted_clients"; };
-	  forwarders {
-	    46.182.19.48;
-	    84.200.69.80;
-	    217.237.150.205;
-	  };
-	  dnssec-validation auto;
-	  auth-nxdomain no;    # conform to RFC1035
-	  listen-on-v6 { any; };
-	};
+	cat <<- 'EOT' > '/etc/bind/named.conf.options'
+		options {
+		  directory "/var/cache/bind";
+		  recursion yes;
+		  allow-query { "acl_trusted_clients"; };
+		  forwarders {
+		    46.182.19.48;
+		    84.200.69.80;
+		    217.237.150.205;
+		  };
+		  dnssec-validation auto;
+		  auth-nxdomain no;    # conform to RFC1035
+		  listen-on-v6 { any; };
+		};
 
-	acl "acl_trusted_transfer" {
-	  none;
-	};
+		acl "acl_trusted_transfer" {
+		  none;
+		};
 
-	acl "acl_trusted_clients" {
-	  // localhost (RFC 3330) - Loopback-Device addresses
-	  127.0.0.0/8;    // 127.0.0.0 - 127.255.255.255
+		acl "acl_trusted_clients" {
+		  // localhost (RFC 3330) - Loopback-Device addresses
+		  127.0.0.0/8;    // 127.0.0.0 - 127.255.255.255
 
-	  // Private Network (RFC 1918) - LAN, WLAN etc.
-	  192.168.0.0/24; // 192.168.0.0 - 192.168.0.255
-	};
+		  // Private Network (RFC 1918) - LAN, WLAN etc.
+		  192.168.0.0/24; // 192.168.0.0 - 192.168.0.255
+		};
 	EOT
 
-	cat <<- 'EOT' >> '/etc/bind/named.conf.local'
-	zone "local" {
-	  type master;
-	  file "/etc/bind/db.raspi";
-	  allow-transfer { acl_trusted_transfer; };
-	};
+	cat <<- EOT > '/etc/bind/named.conf.local'
+		zone "$THIS_DOMAIN" {
+		  type master;
+		  file "/etc/bind/db.raspi";
+		  allow-transfer { acl_trusted_transfer; };
+		};
 
-	zone "0.168.192.in-addr.arpa" {
-	  notify no;
-	  type master;
-	  file "/etc/bind/rev.raspi";
-	};
+		zone "0.168.192.in-addr.arpa" {
+		  notify no;
+		  type master;
+		  file "/etc/bind/rev.raspi";
+		};
 	EOT
 
 	cat <<- EOT > '/etc/bind/db.raspi'
-	$TTL 3D
-	@ IN SOA local. postmaster.local. (
-	  0000000001      ;serial
-	  3H              ;refresh
-	  15M             ;retry
-	  1W              ;expiry
-	  1D )            ;minimum
+		$TTL 3D
+		@ IN SOA $THIS_DOMAIN. postmaster.$THIS_DOMAIN. (
+		  0000000001      ;serial
+		  3H              ;refresh
+		  15M             ;retry
+		  1W              ;expiry
+		  1D )            ;minimum
 
-	@ IN NS $RASP_NAME.local.
-	  IN A  $RASP_IP
-	$RASP_NAME IN A $RASP_IP
-	game       IN A 192.168.0.20
-	work       IN A 192.168.0.30
-	router     IN A $RASP_DEF
+		@ IN NS $THIS_NAME.$THIS_DOMAIN.
+		  IN A  $THIS_IP
+		$THIS_NAME IN A $THIS_IP
+		game       IN A 192.168.0.20
+		work       IN A 192.168.0.30
+		router     IN A $THIS_DEF
 	EOT
 
 	cat <<- EOT > '/etc/bind/rev.raspi'
-	$TTL 3D
-	@ IN SOA local. postmaster.local. (
-	  0000000001      ;serial
-	  3H              ;refresh
-	  15M             ;retry
-	  1W              ;expiry
-	  1H )            ;negative caching
+		$TTL 3D
+		@ IN SOA $THIS_DOMAIN. postmaster.$THIS_DOMAIN. (
+		  0000000001      ;serial
+		  3H              ;refresh
+		  15M             ;retry
+		  1W              ;expiry
+		  1H )            ;negative caching
 
-	@ IN NS $RASP_NAME.local.
+		@ IN NS $THIS_NAME.$THIS_DOMAIN.
 
-	10 IN PTR $RASP_NAME.local.
-	20 IN PTR game.local.
-	30 IN PTR work.local.
-	1  IN PTR router.local.
+		10 IN PTR $THIS_NAME.$THIS_DOMAIN.
+		20 IN PTR game.$THIS_DOMAIN.
+		30 IN PTR work.$THIS_DOMAIN.
+		1  IN PTR router.$THIS_DOMAIN.
 	EOT
 
 	chown bind:bind *.raspi
@@ -595,21 +598,21 @@ if [[ ! -z "$DO_BIND" ]]; then
 	if ! grep -F -q 'logging {' $NAMED_CONF ; then
 		cat <<- 'EOT' >> $NAMED_CONF
 
-		logging {
-		  channel query.log {
-		    file "/var/lib/bind/bind_query.log" versions 3 size 5m;
-		    // set the severity to dynamic to see the debug messages
-		    severity dynamic;
-		    print-time yes;
-		  };
-		  category queries {
-		    query.log;
-		  };
-		};
+			logging {
+			  channel query.log {
+			    file "/var/lib/bind/bind_query.log" versions 3 size 5m;
+			    // set the severity to dynamic to see the debug messages
+			    severity dynamic;
+			    print-time yes;
+			  };
+			  category queries {
+			    query.log;
+			  };
+			};
 		EOT
 	fi
-	sed -i "s|^include \"/etc/bind/named.conf.options\";|#include \"/etc/bind/named.conf.options\";|" $NAMED_CONF
-	sed -i "s|^include \"/etc/bind/named.conf.local\";|#include \"/etc/bind/named.conf.local\";|"     $NAMED_CONF
+	sed -i 's|^include "/etc/bind/named.conf.options";|#include "/etc/bind/named.conf.options";|' $NAMED_CONF
+	sed -i 's|^include "/etc/bind/named.conf.local";|#include "/etc/bind/named.conf.local";|'     $NAMED_CONF
 
 	systemctl enable  bind9
 	systemctl restart bind9
@@ -644,7 +647,7 @@ if [[ ! -z "$DO_SSL" ]]; then
 
 	mkdir -p $SSL_CONF
 	openssl genrsa -out "$SSL_CONF/apachessl.pem"
-	openssl req -new -key "$SSL_CONF/apachessl.pem" -out "$SSL_CONF/apachessl.csr" -sha512 -subj "/C=DE/ST=Bayern/OU=Private/CN=$RASP_IP"
+	openssl req -new -key "$SSL_CONF/apachessl.pem" -out "$SSL_CONF/apachessl.csr" -sha512 -subj "/C=DE/ST=Bayern/OU=Private/CN=$THIS_IP"
 	openssl x509 -days 365 -req -in "$SSL_CONF/apachessl.csr" -signkey "$SSL_CONF/apachessl.pem" -out "$SSL_CONF/apachessl.crt" -sha512
 
 	mkdir -p $SSL_OLD
@@ -752,10 +755,10 @@ if [[ ! -z "$DO_NEXT_CLOUD" ]]; then
 	echo
 
 	cat <<- EOT > $NEXT_TEMP
-	CREATE DATABASE $NEXT_DATA;
-	CREATE USER '$NEXT_USER'@'localhost' IDENTIFIED BY '$NEXT_PW';
-	GRANT ALL ON $NEXT_DATA.* TO '$NEXT_USER'@'localhost';
-	FLUSH PRIVILEGES;
+		CREATE DATABASE $NEXT_DATA;
+		CREATE USER '$NEXT_USER'@'localhost' IDENTIFIED BY '$NEXT_PW';
+		GRANT ALL ON $NEXT_DATA.* TO '$NEXT_USER'@'localhost';
+		FLUSH PRIVILEGES;
 	EOT
 
 	mysql -u root -p < $NEXT_TEMP
