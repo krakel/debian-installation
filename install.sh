@@ -35,6 +35,7 @@ Commands:
   snap      rsnapshot+rsync backups on local system
   tools     xfce tools
   etcher    bootable USB drives or SD cards
+  unet      bootable USB drives or SD cards
 
   kvm       KVM, QEMU with Virt-Manager (1 reboot)
   iso       install a iso
@@ -48,6 +49,9 @@ Commands:
   dnet      Microsoft .Net 4.6.1 (do not use)
   java      java 8+14 jdk
   multimc   Minecraft MultiMC
+  scala     scala 2
+  dotty     scala 3
+  sbt       scala sbt
 
   chatty    Chatty
   discord   Discord
@@ -82,10 +86,11 @@ declare -A SELECT=(
 	[cuda]=DO_CUDA_TEXT
 	[discord]=DO_DISCORD
 	[dnet]=DO_DOT_NET
+	[dotty]=DO_DOTTY
 	[dream]=DO_DREAMBOX_EDIT
 	[dxvk]=DO_DXVK
-	[gpic]=DO_GPIC
 	[etcher]=DO_ETCHER
+	[gpic]=DO_GPIC
 	[iso]=DO_ISO
 	[java]=DO_JAVA
 	[kvm]=DO_KVM
@@ -100,6 +105,8 @@ declare -A SELECT=(
 	[ohmyz]=DO_OHMYZ
 	[pwsafe]=DO_PASSWORD_SAFE
 	[samba]=DO_SAMBA
+	[sbt]=DO_SBT
+	[scala]=DO_SCALA
 	[screen]=DO_SCREENSAVER
 	[snap]=DO_SNAPSHOT
 	[spotify]=DO_SPOTIFY
@@ -110,6 +117,7 @@ declare -A SELECT=(
 	[test]=DO_TEST
 	[tools]=DO_TOOLS
 	[twitch]=DO_TWITCH_GUI
+	[unet]=DO_UNETBOOTIN
 	[unstable]=DO_UNSTABLE
 	[video]=DO_VIDEOLAN
 	[viewnior]=DO_VIEWNIOR
@@ -311,17 +319,17 @@ function downloadDriver() {
 		rm -f Downloads/$4
 	fi
 	local searchObj=$(listFile $3)
-	if [[ ! -z "$1" ]] && [[ ! -f "$searchObj" ]]; then
-		sudo -u $SUDO_USER bash -c "DISPLAY=:0.0 x-www-browser $1"
-		read -p "Press [Enter] key to continue if you finished the download of the latest driver to '~/Downloads/'"
-		searchObj=$(listFile $3)
-	fi
 	if [[ ! -z "$2" ]] && [[ ! -f "$searchObj" ]]; then
 		if [[ -z "$4" ]]; then
 			sudo -u $SUDO_USER wget -P Downloads $2
 		else
 			sudo -u $SUDO_USER wget -P Downloads $2 -c $4
 		fi
+		searchObj=$(listFile $3)
+	fi
+	if [[ ! -z "$1" ]] && [[ ! -f "$searchObj" ]]; then
+		sudo -u $SUDO_USER bash -c "DISPLAY=:0.0 x-www-browser $1"
+		read -p "Press [Enter] key to continue if you finished the download of the latest driver to '~/Downloads/'"
 		searchObj=$(listFile $3)
 	fi
 	if [[ ! -f "$searchObj" ]]; then
@@ -575,7 +583,7 @@ if [[ ! -z "$DO_NVIDIA" ]]; then
 		rebootNow
 	else
 		NVIDIA_URL='https://www.nvidia.com/en-us/drivers/unix/'
-		NVIDIA_REL='450.66' # 440.82 440.100
+		NVIDIA_REL='450.80.02' # 450.66 440.82 440.100
 		NVIDIA_DEF="http://us.download.nvidia.com/XFree86/Linux-x86_64/$NVIDIA_REL/NVIDIA-Linux-x86_64-$NVIDIA_REL.run"
 		NVIDIA_SRC='NVIDIA-Linux-x86_64-*.run'
 		NVIDIA_DRV=$(downloadDriver $NVIDIA_URL $NVIDIA_DEF $NVIDIA_SRC)
@@ -745,7 +753,7 @@ if [[ ! -z "$DO_KVM" ]]; then
 
 		cat <<- EOT > "/etc/network/interfaces.d/$theBridge"
 			# The primary network interface
-			auto $thePort
+			auto  $thePort
 			iface $thePort inet manual
 
 			auto $theBridge
@@ -1320,6 +1328,74 @@ if [[ ! -z "$DO_MULTI_MC" ]]; then
 fi
 
 #####################################################################
+#####################################################################
+######### scala 2
+if [[ ! -z "$DO_SCALA" ]]; then
+	echo '######### install scala 2'
+
+	SCALA_URL='https://www.scala-lang.org/download/'
+	SCALA_GET='https://downloads.lightbend.com/scala'
+	SCALA_REL='2.13.4'
+	SCALA_DEF="scala-$SCALA_REL.tgz"
+	SCALA_SRC='scala-*.tgz'
+	SCALA_DRV=$(downloadDriver $SCALA_URL $SCALA_GET/$SCALA_REL/$SCALA_DEF $SCALA_SRC)
+
+	SCALA_DIR='/usr/lib/scala'
+	SCALA_FLR=$(basename $SCALA_DRV .tgz)
+	SCALA_PRI=${SCALA_FLR#scala-}
+	SCALA_PRI=${SCALA_PRI//.}
+
+	mkdir -p $SCALA_DIR
+	rm -rf $SCALA_DIR/$SCALA_FLR
+
+	tar -xvzf $SCALA_DRV --directory $SCALA_DIR
+
+	update-alternatives --install /usr/bin/scala  scala  "$SCALA_DIR/$SCALA_FLR/bin/scala"  $SCALA_PRI
+	update-alternatives --install /usr/bin/scalac scalac "$SCALA_DIR/$SCALA_FLR/bin/scalac" $SCALA_PRI
+	update-alternatives --install /usr/bin/scalad scalad "$SCALA_DIR/$SCALA_FLR/bin/scalad" $SCALA_PRI
+fi
+
+#####################################################################
+#####################################################################
+######### scala 3
+if [[ ! -z "$DO_DOTTY" ]]; then
+	echo '######### install scala 3'
+
+	DOTTY_URL='https://github.com/lampepfl/dotty/releases'
+	DOTTY_REL='3.0.0-M3'
+	DOTTY_DEF="scala3-$DOTTY_REL.zip"
+	DOTTY_SRC='scala3-*.zip'
+	DOTTY_DRV=$(downloadDriver $DOTTY_URL $DOTTY_URL/download/$DOTTY_REL/$DOTTY_DEF $DOTTY_SRC)
+
+	DOTTY_DIR='/usr/lib/scala'
+	DOTTY_FLR=$(basename $DOTTY_DRV .zip)
+	DOTTY_PRI=${DOTTY_FLR#scala3-}
+	DOTTY_PRI=${DOTTY_PRI//[!0-9]}
+
+	mkdir -p $DOTTY_DIR
+	rm -rf $DOTTY_DIR/$DOTTY_FLR
+
+	unzip $DOTTY_DRV -d $DOTTY_DIR
+
+	update-alternatives --install /usr/bin/scala  scala  "$DOTTY_DIR/$DOTTY_FLR/bin/scala"  $DOTTY_PRI
+	update-alternatives --install /usr/bin/scalac scalac "$DOTTY_DIR/$DOTTY_FLR/bin/scalac" $DOTTY_PRI
+	update-alternatives --install /usr/bin/scalad scalad "$DOTTY_DIR/$DOTTY_FLR/bin/scalad" $DOTTY_PRI
+fi
+
+#####################################################################
+#####################################################################
+######### scala sbt
+if [[ ! -z "$DO_SBT" ]]; then
+	echo '######### install sbt'
+
+	addPgpKey 'sbt.gpg' 'https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x2EE0EA64E40A89B84B2DF73499E82A75642AC823'
+	echo 'deb https://dl.bintray.com/sbt/debian /' > $SOURCES_DIR/sbt.list
+
+	sudo apt-get update
+	sudo apt-get install sbt
+fi
+
+#####################################################################
 # Media
 #####################################################################
 
@@ -1509,7 +1585,7 @@ if [[ ! -z "$DO_CHATTY" ]]; then
 	apt install default-jre
 
 	CHATTY_URL='https://github.com/chatty/chatty/releases'
-	CHATTY_REL='0.13'
+	CHATTY_REL='0.13.1'
 	CHATTY_DEF="Chatty_$CHATTY_REL.zip"
 	CHATTY_SRC='Chatty_*.zip'
 	CHATTY_DRV=$(downloadDriver $CHATTY_URL $CHATTY_URL/download/v$CHATTY_REL/$CHATTY_DEF $CHATTY_SRC)
@@ -1963,7 +2039,6 @@ fi
 
 #####################################################################
 #####################################################################
-######### Viewnior image viewer
 if [[ ! -z "$DO_ETCHER" ]]; then
 	echo '######### install Etcher.io'
 
@@ -1972,6 +2047,23 @@ if [[ ! -z "$DO_ETCHER" ]]; then
 
 	apt update
 	apt install balena-etcher-electron
+fi
+
+#####################################################################
+#####################################################################
+if [[ ! -z "$DO_UNETBOOTIN" ]]; then
+	echo '######### install unetbootin'
+
+	UNET_URL='https://github.com/unetbootin/unetbootin/releases/download'
+	UNET_REL=700
+	UNET_BIN="unetbootin-linux64-$UNET_REL.bin"
+
+	apt install mtools syslinux syslinux-common floppyd extlinux
+
+	sudo -u $SUDO_USER wget -P Downloads "$UNET_URL/$UNET_REL/$UNET_BIN"
+
+	chmod +x Downloads/$UNET_BIN
+	cp Downloads/$UNET_BIN /usr/bin
 fi
 
 #####################################################################
