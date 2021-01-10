@@ -1,11 +1,5 @@
 #!/bin/bash
 
-# check before
-# dmesg         # print or control the kernel ring buffer
-# journalctl    # query the systemd journal
-
-# lvm VG root vg
-
 function helpMsg() {
   echo 'Usage:
   install su
@@ -47,11 +41,7 @@ Commands:
   lutris    Lutris
   dxvk      vulkan-based compatibility layer for Direct3D
   dnet      Microsoft .Net 4.6.1 (do not use)
-  java      java 8+14 jdk
   multimc   Minecraft MultiMC
-  scala     scala 2
-  dotty     scala 3
-  sbt       scala sbt
 
   chatty    Chatty
   discord   Discord
@@ -60,10 +50,6 @@ Commands:
   spotify   Spotify, some music
   twitch    twitch gui
   video     VideoLan
-
-  atom      Atom IDE
-  cuda      CudaText editor (little bit unusable)
-  sub       Sublime editor (better, need license)
 
   gpic      GPicview image viewer
   viewnior  Viewnior image viewer
@@ -78,21 +64,17 @@ declare -A SELECT=(
 	[agent]=DO_SSH_AGENT
 	[amd]=DO_AMD
 	[anbox]=DO_ANBOX
-	[atom]=DO_ATOM
 	[chatty]=DO_CHATTY
 	[cifs]=DO_CIFS
 	[cifsk]=DO_CIFS_KVM
 	[conky]=DO_CONKY
-	[cuda]=DO_CUDA_TEXT
 	[discord]=DO_DISCORD
 	[dnet]=DO_DOT_NET
-	[dotty]=DO_DOTTY
 	[dream]=DO_DREAMBOX_EDIT
 	[dxvk]=DO_DXVK
 	[etcher]=DO_ETCHER
 	[gpic]=DO_GPIC
 	[iso]=DO_ISO
-	[java]=DO_JAVA
 	[kvm]=DO_KVM
 	[login]=DO_AUTO_LOGIN
 	[lutris]=DO_LUTRIS
@@ -105,15 +87,12 @@ declare -A SELECT=(
 	[ohmyz]=DO_OHMYZ
 	[pwsafe]=DO_PASSWORD_SAFE
 	[samba]=DO_SAMBA
-	[sbt]=DO_SBT
-	[scala]=DO_SCALA
 	[screen]=DO_SCREENSAVER
 	[snap]=DO_SNAPSHOT
 	[spotify]=DO_SPOTIFY
 	[src]=DO_SOURCE
 	[steam]=DO_STEAM
 	[su]=ONLY_SUDOER
-	[sub]=DO_SUBLIME
 	[test]=DO_TEST
 	[tools]=DO_TOOLS
 	[twitch]=DO_TWITCH_GUI
@@ -147,6 +126,9 @@ done
 SUDO_USER=$(logname)
 HOME_USER="/home/$SUDO_USER"
 
+SOURCES='/etc/apt/sources.list'
+SOURCES_DIR='/etc/apt/sources.list.d'
+
 THIS_NAME=game
 THIS_IP=192.168.0.20
 THIS_DNS=192.168.0.10
@@ -157,17 +139,7 @@ THIS_DOMAIN='at-home'
 WIN_USER=$SUDO_USER              # change this to your windows user name
 WIN_DOMAIN="work.$THIS_DOMAIN"	# change this to your windows domain
 
-SOURCES_DIR='/etc/apt/sources.list.d'
-
 cd $HOME_USER
-
-# apt update      # refreshes repository index
-# apt upgrade     # upgrades all upgradable packages
-# apt autoremove  # removes unwanted packages
-# apt install     # install a package
-# apt remove      # remove a package
-# apt search      # searche for a program
-# apt install --fix-broken
 
 function logoutNow() {
 	echo
@@ -349,7 +321,7 @@ function createDesktopEntry() {
 	chmod 644 /usr/share/applications/$entryName
 }
 
-function createSudoer() {
+function createSudoCmd() {
 	local sudoerFile="/etc/sudoers.d/$1"
 	shift
 
@@ -378,7 +350,6 @@ function addPgpKey() {
 #####################################################################
 # System
 #####################################################################
-SOURCES='/etc/apt/sources.list'
 
 #####################################################################
 #####################################################################
@@ -476,14 +447,12 @@ fi
 #####################################################################
 #####################################################################
 if [[ ! -z "$DO_VISUDO" ]]; then
-	createSudoer "main-cmds" <<- EOT
+	createSudoCmd "main-cmds" <<- EOT
 		Cmnd_Alias SHUTDOWN_CMDS = /sbin/poweroff, /sbin/reboot, /sbin/halt
-		Cmnd_Alias NETZWORK_CMDS = /usr/sbin/tunctl, /sbin/ifconfig, /usr/sbin/brctl, /sbin/ip
 		Cmnd_Alias PRINTING_CMDS = /usr/sbin/lpc, /usr/sbin/lprm
+		Cmnd_Alias ADMIN_CMDS = /usr/sbin/passwd, /usr/sbin/useradd, /usr/sbin/userdel, /usr/sbin/usermod, /usr/sbin/visudo
 		$SUDO_USER ALL= NOPASSWD: SHUTDOWN_CMDS
-		$SUDO_USER ALL= NOPASSWD: NETZWORK_CMDS
 		ALL ALL=(ALL) NOPASSWD: PRINTING_CMDS
-		# Cmnd_Alias ADMIN_CMDS = /usr/sbin/passwd, /usr/sbin/useradd, /usr/sbin/userdel, /usr/sbin/usermod, /usr/sbin/visudo
 		# $SUDO_USER ALL= ADMIN_CMDS
 		# USERS WORKSTATIONS=(ADMINS) ADMIN_CMDS
 	EOT
@@ -583,7 +552,7 @@ if [[ ! -z "$DO_NVIDIA" ]]; then
 		rebootNow
 	else
 		NVIDIA_URL='https://www.nvidia.com/en-us/drivers/unix/'
-		NVIDIA_REL='450.80.02' # 450.66 440.82 440.100
+		NVIDIA_REL='460.32.03' # 450.80.02
 		NVIDIA_DEF="http://us.download.nvidia.com/XFree86/Linux-x86_64/$NVIDIA_REL/NVIDIA-Linux-x86_64-$NVIDIA_REL.run"
 		NVIDIA_SRC='NVIDIA-Linux-x86_64-*.run'
 		NVIDIA_DRV=$(downloadDriver $NVIDIA_URL $NVIDIA_DEF $NVIDIA_SRC)
@@ -860,10 +829,10 @@ if [[ ! -z "$DO_KVM" ]]; then
 	usermod -aG libvirt-qemu $SUDO_USER
 	usermod -aG kvm          $SUDO_USER
 
-	#	createSudoer "kvm-cmds" <<- EOT
-	# Cmnd_Alias KVM = /usr/sbin/tunctl, /sbin/ifconfig, /usr/sbin/brctl, /sbin/ip
-	# %kvm ALL=(ALL) NOPASSWD: KVM
-	# EOT
+	createSudoCmd "kvm-cmds" <<- EOT
+		Cmnd_Alias KVM = /usr/sbin/tunctl, /sbin/ifconfig, /usr/sbin/brctl, /sbin/ip
+		%kvm ALL=(ALL) NOPASSWD: KVM
+	EOT
 
 
 	virsh net-list --all
@@ -1054,12 +1023,12 @@ if [[ ! -z "$DO_VIRTUAL_BOX" ]]; then
 #  apt install libvncserver1 libgsoap-2.8.91 dkms kbuild linux-headers-amd64
 
 #  cd /tmp
-#  wget -nv http://ftp.de.debian.org/debian/pool/contrib/v/virtualbox/virtualbox-dkms_6.1.0-dfsg-2_amd64.deb
-#  wget -nv http://ftp.de.debian.org/debian/pool/contrib/v/virtualbox-ext-pack/virtualbox-ext-pack_6.1.0-1_all.deb
-#  wget -nv http://ftp.de.debian.org/debian/pool/non-free/v/virtualbox-guest-additions-iso/virtualbox-guest-additions-iso_6.0.10-1_all.deb
-#  wget -nv http://ftp.de.debian.org/debian/pool/contrib/v/virtualbox/virtualbox-qt_6.1.0-dfsg-2_amd64.deb
-#  wget -nv http://ftp.de.debian.org/debian/pool/contrib/v/virtualbox/virtualbox-source_6.1.0-dfsg-2_amd64.deb
-#  wget -nv http://ftp.de.debian.org/debian/pool/contrib/v/virtualbox/virtualbox_6.1.0-dfsg-2_amd64.deb
+#  wget http://ftp.de.debian.org/debian/pool/contrib/v/virtualbox/virtualbox-dkms_6.1.0-dfsg-2_amd64.deb
+#  wget http://ftp.de.debian.org/debian/pool/contrib/v/virtualbox-ext-pack/virtualbox-ext-pack_6.1.0-1_all.deb
+#  wget http://ftp.de.debian.org/debian/pool/non-free/v/virtualbox-guest-additions-iso/virtualbox-guest-additions-iso_6.0.10-1_all.deb
+#  wget http://ftp.de.debian.org/debian/pool/contrib/v/virtualbox/virtualbox-qt_6.1.0-dfsg-2_amd64.deb
+#  wget http://ftp.de.debian.org/debian/pool/contrib/v/virtualbox/virtualbox-source_6.1.0-dfsg-2_amd64.deb
+#  wget http://ftp.de.debian.org/debian/pool/contrib/v/virtualbox/virtualbox_6.1.0-dfsg-2_amd64.deb
 
 #  dpkg -i virtualbox-guest-additions-iso_6.0.10-1_all.deb
 #  dpkg -i virtualbox-dkms_6.1.0-dfsg-2_amd64.deb
@@ -1115,7 +1084,7 @@ if [[ ! -z "$DO_ANBOX" ]]; then
 	# snap install --devmode --beta anbox
 	# snap refresh --beta --devmode anbox
 	# snap info anbox
-	# wget -O /var/lib/anbox/android.img https://build.anbox.io/android-images/2018/07/19/android_amd64.img
+	# wget https://build.anbox.io/android-images/2018/07/19/android_amd64.img -O /var/lib/anbox/android.img
 	# There are two systemd services.
 	# sudo systemctl start anbox-container-manager.service
 	# systemctl --user start anbox-session-manager.service
@@ -1155,12 +1124,12 @@ if [[ ! -z "$DO_WINE" ]]; then
 	# apt update
 
 	# LIB_SDL=libsdl2-2.0-0_2.0.10+dfsg1-1_amd64.deb
-	# sudo -u $SUDO_USER wget -P Downloads -nv http://ftp.us.debian.org/debian/pool/main/libs/libsdl2/$LIB_SDL
+	# sudo -u $SUDO_USER wget -P Downloads http://ftp.us.debian.org/debian/pool/main/libs/libsdl2/$LIB_SDL
 	# dpkg -i Downloads/$LIB_SDL
 	# apt install libsdl2-2.0-0
 
 	# LIB_FAUDIO=libfaudio0_20.01-0~bullseye_amd64.deb
-	# sudo -u $SUDO_USER wget -P Downloads -nv https://$OBS_URL/amd64/$LIB_FAUDIO
+	# sudo -u $SUDO_USER wget -P Downloads https://$OBS_URL/amd64/$LIB_FAUDIO
 	# dpkg -i Downloads/$LIB_FAUDIO
 	# apt install libfaudio0
 
@@ -1285,32 +1254,6 @@ fi
 
 #####################################################################
 #####################################################################
-######### java
-# sudo update-alternatives --config java
-if [[ ! -z "$DO_JAVA" ]]; then
-	echo '######### install java'
-	apt install default-jre
-	apt install default-jdk
-
-	apt install openjdk-15-jdk
-	apt install openjdk-8-jdk
-
-	# https://www.oracle.com/java/technologies/javase-jdk8-downloads.html
-	# apt install oracle-java8-installer
-
-	JFROG_BUILDS='https://adoptopenjdk.jfrog.io/adoptopenjdk'
-	addPgpKey 'jfrog.gpg' "$JFROG_BUILDS/api/gpg/key/public"
-	echo "deb $JFROG_BUILDS/deb/ buster main" > $SOURCES_DIR/jfrog.list
-	apt update
-
-	apt install "adoptopenjdk-15-hotspot"
-	apt install "adoptopenjdk-8-hotspot"
-#  apt install "adoptopenjdk-8-hotspot-jre"
-#  apt install" adoptopenjdk-8-openj9-jre"
-fi
-
-#####################################################################
-#####################################################################
 ######### MultiMC
 # https://multimc.org
 if [[ ! -z "$DO_MULTI_MC" ]]; then
@@ -1328,74 +1271,6 @@ if [[ ! -z "$DO_MULTI_MC" ]]; then
 fi
 
 #####################################################################
-#####################################################################
-######### scala 2
-if [[ ! -z "$DO_SCALA" ]]; then
-	echo '######### install scala 2'
-
-	SCALA_URL='https://www.scala-lang.org/download/'
-	SCALA_GET='https://downloads.lightbend.com/scala'
-	SCALA_REL='2.13.4'
-	SCALA_DEF="scala-$SCALA_REL.tgz"
-	SCALA_SRC='scala-*.tgz'
-	SCALA_DRV=$(downloadDriver $SCALA_URL $SCALA_GET/$SCALA_REL/$SCALA_DEF $SCALA_SRC)
-
-	SCALA_DIR='/usr/lib/scala'
-	SCALA_FLR=$(basename $SCALA_DRV .tgz)
-	SCALA_PRI=${SCALA_FLR#scala-}
-	SCALA_PRI=${SCALA_PRI//.}
-
-	mkdir -p $SCALA_DIR
-	rm -rf $SCALA_DIR/$SCALA_FLR
-
-	tar -xvzf $SCALA_DRV --directory $SCALA_DIR
-
-	update-alternatives --install /usr/bin/scala  scala  "$SCALA_DIR/$SCALA_FLR/bin/scala"  $SCALA_PRI
-	update-alternatives --install /usr/bin/scalac scalac "$SCALA_DIR/$SCALA_FLR/bin/scalac" $SCALA_PRI
-	update-alternatives --install /usr/bin/scalad scalad "$SCALA_DIR/$SCALA_FLR/bin/scalad" $SCALA_PRI
-fi
-
-#####################################################################
-#####################################################################
-######### scala 3
-if [[ ! -z "$DO_DOTTY" ]]; then
-	echo '######### install scala 3'
-
-	DOTTY_URL='https://github.com/lampepfl/dotty/releases'
-	DOTTY_REL='3.0.0-M3'
-	DOTTY_DEF="scala3-$DOTTY_REL.zip"
-	DOTTY_SRC='scala3-*.zip'
-	DOTTY_DRV=$(downloadDriver $DOTTY_URL $DOTTY_URL/download/$DOTTY_REL/$DOTTY_DEF $DOTTY_SRC)
-
-	DOTTY_DIR='/usr/lib/scala'
-	DOTTY_FLR=$(basename $DOTTY_DRV .zip)
-	DOTTY_PRI=${DOTTY_FLR#scala3-}
-	DOTTY_PRI=${DOTTY_PRI//[!0-9]}
-
-	mkdir -p $DOTTY_DIR
-	rm -rf $DOTTY_DIR/$DOTTY_FLR
-
-	unzip $DOTTY_DRV -d $DOTTY_DIR
-
-	update-alternatives --install /usr/bin/scala  scala  "$DOTTY_DIR/$DOTTY_FLR/bin/scala"  $DOTTY_PRI
-	update-alternatives --install /usr/bin/scalac scalac "$DOTTY_DIR/$DOTTY_FLR/bin/scalac" $DOTTY_PRI
-	update-alternatives --install /usr/bin/scalad scalad "$DOTTY_DIR/$DOTTY_FLR/bin/scalad" $DOTTY_PRI
-fi
-
-#####################################################################
-#####################################################################
-######### scala sbt
-if [[ ! -z "$DO_SBT" ]]; then
-	echo '######### install sbt'
-
-	addPgpKey 'sbt.gpg' 'https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x2EE0EA64E40A89B84B2DF73499E82A75642AC823'
-	echo 'deb https://dl.bintray.com/sbt/debian /' > $SOURCES_DIR/sbt.list
-
-	sudo apt-get update
-	sudo apt-get install sbt
-fi
-
-#####################################################################
 # Media
 #####################################################################
 
@@ -1409,7 +1284,7 @@ if [[ ! -z "$DO_DISCORD" ]]; then
 	DISCORD_URL='https://discordapp.com/api/download?platform=linux&format=deb'
 	DISCORD_SRC='discord*.deb'
 	DISCORD_LST='discord-latest.deb'
-	echo "ownload_driver '' $DISCORD_URL $DISCORD_SRC"
+	echo "download_driver '' $DISCORD_URL $DISCORD_SRC"
 	DISCORD_DRV=$(downloadDriver '' $DISCORD_URL $DISCORD_SRC $DISCORD_LST)
 
 	apt install libgconf-2-4
@@ -1585,7 +1460,7 @@ if [[ ! -z "$DO_CHATTY" ]]; then
 	apt install default-jre
 
 	CHATTY_URL='https://github.com/chatty/chatty/releases'
-	CHATTY_REL='0.13.1'
+	CHATTY_REL='0.14-b2'
 	CHATTY_DEF="Chatty_$CHATTY_REL.zip"
 	CHATTY_SRC='Chatty_*.zip'
 	CHATTY_DRV=$(downloadDriver $CHATTY_URL $CHATTY_URL/download/v$CHATTY_REL/$CHATTY_DEF $CHATTY_SRC)
@@ -1597,24 +1472,6 @@ fi
 #####################################################################
 # Diverse
 #####################################################################
-
-#####################################################################
-#####################################################################
-######### Atom
-# https://linuxhint.com/install_atom_text_editor_debian_10/
-if [[ ! -z "$DO_ATOM" ]]; then
-	echo '######### install Atom IDE'
-	ATOM_URL='https://github.com/atom/atom/releases'
-	ATOM_REL='1.51.0'
-	ATOM_DEF='atom-amd64.deb'
-	ATOM_SRC='atom-*.deb'
-	ATOM_DRV=$(downloadDriver $ATOM_URL $ATOM_URL/download/v$ATOM_REL/$ATOM_DEF $ATOM_SRC)
-
-	apt install gvfs-bin
-	dpkg -i $ATOM_DRV
-
-	atom --version
-fi
 
 #####################################################################
 #####################################################################
@@ -1642,110 +1499,15 @@ fi
 
 #####################################################################
 #####################################################################
-######### better text editor
-# https://www.sublimetext.com/
-if [[ ! -z "$DO_SUBLIME" ]]; then
-	echo '######### install Sublime editor'
-
-	addPgpKey 'sublime.gpg' 'https://download.sublimetext.com/sublimehq-pub.gpg'
-	echo 'deb https://download.sublimetext.com/ apt/stable/' > $SOURCES_DIR/sublime.list
-	apt update
-
-	apt install sublime-text
-
-	ln -s /opt/sublime_text/sublime_text /usr/bin/sublime_text
-
-	createDesktopEntry "sublime.desktop" <<- EOT
-		[Desktop Entry]
-		Version=1.0
-		Name=Sublime
-		Comment=a cross-platform text editor
-		Exec=/opt/sublime_text/sublime_text %F
-		Icon=sublime-text.png
-		Terminal=false
-		Type=Application
-		Categories=Utility;Application;Editor;
-		StartupNotify=true
-	EOT
-
-	if [[ -d "Downloads/sublime/User" ]]; then
-		CONFIG_SUBLIME="~/.config/sublime-text-3/Packages/User/"
-		sudo -u $SUDO_USER mkdir -p $CONFIG_SUBLIME
-		sudo -u $SUDO_USER cp -r Downloads/sublime/User/* $CONFIG_SUBLIME
-	fi
-fi
-
-#####################################################################
-#####################################################################
-######### nice text editor
-# http://uvviewsoft.com/cudatext/
-if [[ ! -z "$DO_CUDA_TEXT" ]]; then
-	echo '######### install CudaText editor'
-	CUDA_URL='https://www.fosshub.com/CudaText.html'
-	CUDA_DEF='cudatext_1.98.0.0-1_gtk2_amd64.deb'
-	CUDA_SRC='cudatext_*_gtk2_amd64.deb'
-	CUDA_DEB=$(downloadDriver $CUDA_URL '' $CUDA_SRC)
-
-	echo "execute 'sudo dpkg -i $CUDA_DEB'"
-	dpkg -i $CUDA_DEB
-
-	createDesktopEntry "cudatext.desktop" <<- EOT
-		[Desktop Entry]
-		Version=1.0
-		Name=Cuda Text
-		Comment=a cross-platform text editor
-		Exec=cudatext
-		Icon=cudatext-512.png
-		Terminal=false
-		Type=Application
-		Categories=Utility;Application;Editor;
-		StartupNotify=true
-	EOT
-
-	PHYLIB=$(find /usr -name 'libpython3.*so*' 2>/dev/null | head -1)
-
-	CUDA_SETTING='.config/cudatext/settings'
-	sudo -u $SUDO_USER mkdir -p "$CUDA_SETTING"
-
-	cat <<- 'EOT' | sudo -u $SUDO_USER tee "$CUDA_SETTING/user.json" > /dev/null
-		{
-		  "auto_close_brackets": "([{\"'",
-		  "font_name__linux": "Monospace",
-		  "font_size__linux": 10,
-		  "indent_size": 2,
-		  "numbers_show": false,
-		  "pylib__linux": "$(basename $PHYLIB)",
-		  "saving_force_final_eol": true,
-		  "saving_trim_spaces": true,
-		  "tab_size": 4,
-		  "ui_one_instance": true,
-		  "ui_reopen_session": false,
-		  "ui_sidebar_show": false,
-		  "ui_theme": "ebony",
-		  "ui_theme_syntax": "ebony",
-		  "ui_toolbar_show": true,
-		}
-	EOT
-
-	find /usr -name 'libpython3.*so*' 2>/dev/null
-	echo
-	echo "at <options>..<Settings - user> change entry 'pylib__linux' and try other if not working"
-	echo "\"pylib__linux\" : \"$(basename $PHYLIB)\""
-	echo
-	echo "install with <Plugins><Addon Manager> 'Highlight Occurrences' if you want"
-fi
-
-#####################################################################
-#####################################################################
 ######### nice icon sets
 # https://snwh.org/moka
 if [[ ! -z "$DO_MOKA" ]]; then
 	echo '######### install Moka'
 	LAUNCHMAD_LIBS='https://launchpadlibrarian.net'
 
-	sudo -u $SUDO_USER wget -P Downloads -nv $LAUNCHMAD_LIBS/425937281/moka-icon-theme_5.4.523-201905300105~daily~ubuntu18.04.1_all.deb -O moka-icon-theme_5.4.523.deb
-	sudo -u $SUDO_USER wget -P Downloads -nv $LAUNCHMAD_LIBS/375793783/faba-icon-theme_4.3.317-201806241721~daily~ubuntu18.04.1_all.deb -O faba-icon-theme_4.3.317.deb
-# sudo -u $SUDO_USER wget -P Downloads -nv $LAUNCHMAD_LIBS/373757993/faba-mono-icons_4.4.102-201604301531~daily~ubuntu18.04.1_all.deb -O faba-mono-icons_4.4.102.deb
+	sudo -u $SUDO_USER wget $LAUNCHMAD_LIBS/425937281/moka-icon-theme_5.4.523-201905300105~daily~ubuntu18.04.1_all.deb -O Downloads/moka-icon-theme_5.4.523.deb
+	sudo -u $SUDO_USER wget $LAUNCHMAD_LIBS/375793783/faba-icon-theme_4.3.317-201806241721~daily~ubuntu18.04.1_all.deb -O Downloads/faba-icon-theme_4.3.317.deb
+# sudo -u $SUDO_USER wget $LAUNCHMAD_LIBS/373757993/faba-mono-icons_4.4.102-201604301531~daily~ubuntu18.04.1_all.deb -O Downloads/faba-mono-icons_4.4.102.deb
 
 	dpkg -i Downloads/moka-icon-theme_5.4.523.deb
 	dpkg -i Downloads/faba-icon-theme_4.3.317.deb
@@ -1934,7 +1696,7 @@ if [[ ! -z "$DO_CIFS" ]]; then
 		StartupNotify=true
 	EOT
 
-	createSudoer "win-cmds" <<- EOT
+	createSudoCmd "win-cmds" <<- EOT
 		$SUDO_USER ALL= NOPASSWD: $WIN_SHELL
 	EOT
 
@@ -2006,7 +1768,7 @@ if [[ ! -z "$DO_CIFS_KVM" ]]; then
 		StartupNotify=true
 	EOT
 
-	createSudoer "win-cmds-kvm" <<- EOT
+	createSudoCmd "win-cmds-kvm" <<- EOT
 		$SUDO_USER ALL= NOPASSWD: $WIN_SHELL_KVM
 	EOT
 
@@ -2063,7 +1825,7 @@ if [[ ! -z "$DO_UNETBOOTIN" ]]; then
 	sudo -u $SUDO_USER wget -P Downloads "$UNET_URL/$UNET_REL/$UNET_BIN"
 
 	chmod +x Downloads/$UNET_BIN
-	cp Downloads/$UNET_BIN /usr/bin
+	cp Downloads/$UNET_BIN /usr/local/bin
 fi
 
 #####################################################################

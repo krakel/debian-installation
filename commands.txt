@@ -1,0 +1,75 @@
+apt update      # refreshes repository index
+apt upgrade     # upgrades all upgradable packages
+apt autoremove  # removes unwanted packages
+apt install     # install a package
+apt remove      # remove a package
+apt search      # searche for a program
+apt install --fix-broken
+
+# check before
+dmesg         # print or control the kernel ring buffer
+journalctl    # query the systemd journal
+# lvm VG root vg
+
+dhcpcd		# dhcp initialisieren
+lsblk			# Festplatten auflisten
+df				# Filesystem auflisten
+
+# Beispiel Partitionierung
+cfdisk /dev/xyz 			# Festplatte partitionieren
+
+mkfs.msdos -F 32 /dev/xyz1
+mkfs.ext4 /dev/xyz2
+
+mount /dev/xyz2 /mnt
+
+mkdir /mnt/boot
+mount /dev/xyz1 /mnt/boot
+
+genfstab -U /mnt > /mnt/etc/fstab
+
+chroot /mnt					# shell mit spezielle root dirctory
+
+# Zeitzone festlegen
+ln -s /usr/share/zoneinfo/Europe/Berlin /etc/localtime
+
+# Sprachlokalisierung festlegen
+nano /etc/locale.gen 	# de_DE.UTF-8 UTF-8
+locale-gen					# Sprachlokalisierung laden
+
+# System Sprache festlegen
+export LANG=de_DE.UTF-8
+dpkg-reconfigure locales	# Sprache laden
+
+# Hostname fastlegen
+echo "<hostname>" > /etc/hostname
+
+# root Passwort festlegen
+passwd
+
+# RAM Disk erstellen
+mkinitramfs -o ~/tmp/initramfs-$(uname -r)	# for current running kernel
+
+# Bootloader installieren
+apt install grub
+apt install efibootmgr dosfstools gptfdisk
+grub-install --target=x86_64-efi --efi-directory=/boot  --bootloader-id=debian_grub --recheck --debug
+grub-mkconfig -o /boot/grub/grub.cfg
+
+# alles unmounten
+unmount -R /mnt
+
+# Netzwerk starten
+# - NetworkManager with demon network-manager
+# - libvirtd
+systemctl enable  NetworkManager
+systemctl start   NetworkManager
+systemctl stop    NetworkManager
+systemctl restart NetworkManager
+
+# Nutzer erstellen
+useradd <name>
+usermod -aG sudo <name>
+passwd <name>
+mkdir /home/<name>
+chown -R <name>:<name> /home/<name>
