@@ -1232,6 +1232,8 @@ if [[ ! -z "$DO_LUTRIS" ]]; then
 	echo "add to Lutris preferences and try other if not working (I don't know if needed)"
 	echo "LD_PRELOAD    = $LUTRIS_PRE"
 	echo "mesa_glthread = true"
+
+#	wget https://cdn.discordapp.com/attachments/538903130704838656/796102070825779250/dxvk_versions.json -P $HOME/.local/share/lutris/runtime/dxvk
 fi
 
 #####################################################################

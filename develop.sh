@@ -13,6 +13,7 @@ Commands:
   dotty     scala 3
   sbt       scala sbt
   coursier  scala Artifact Fetching
+  dotnet    .NET for Linux
 
   atom      Atom IDE
   cuda      CudaText editor (little bit unusable)
@@ -21,8 +22,9 @@ Commands:
 
 declare -A SELECT=(
 	[atom]=DO_ATOM
-	[cuda]=DO_CUDA_TEXT
 	[coursier]=DO_COURSIER
+	[cuda]=DO_CUDA_TEXT
+	[dotnet]=DO_DOTNET
 	[dotty]=DO_DOTTY
 	[java]=DO_JAVA
 	[sbt]=DO_SBT
@@ -240,6 +242,23 @@ if [[ ! -z "$DO_COURSIER" ]]; then
 		-r bintray:scalacenter/releases \
 		-r sonatype:snapshots \
 		-o /usr/local/bin/metals-sublime -f
+fi
+
+#####################################################################
+#####################################################################
+######### dotnet
+if [[ ! -z "$DO_DOTNET" ]]; then
+	echo '######### install dotnet'
+
+	DOTNET_URL='https://packages.microsoft.com/config/debian'
+	DOTNET_DEF="packages-microsoft-prod.deb"
+	DOTNET_DRV=$(downloadDriver $DOTNET_URL $DOTNET_URL/10/$DOTNET_DEF)
+
+	dpkg -i $DOTNET_DRV
+	apt install dotnet-sdk-5.0
+
+#	apt install aspnetcore-runtime-5.0
+#	apt install dotnet-runtime-5.0
 fi
 
 #####################################################################
