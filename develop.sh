@@ -12,8 +12,10 @@ Commands:
   scala     scala 2
   dotty     scala 3
   sbt       scala sbt
-  coursier  scala Artifact Fetching
   dotnet    .NET for Linux
+
+  coursier  scala Artifact Fetching
+  bloop     build server for scala
 
   atom      Atom IDE
   cuda      CudaText editor (little bit unusable)
@@ -22,6 +24,7 @@ Commands:
 
 declare -A SELECT=(
 	[atom]=DO_ATOM
+	[bloop]=DO_BLOOP
 	[coursier]=DO_COURSIER
 	[cuda]=DO_CUDA_TEXT
 	[dotnet]=DO_DOTNET
@@ -124,6 +127,17 @@ function addPgpKey() {
 	fi
 }
 
+function getLatestRelease() {
+	curl --silent "$1/latest" | sed -E 's|.*/tag/([^"]+).*|\1|'
+}
+
+function updateAlternatives() {
+	local dir=$1
+	local pack=$2
+	local nr=$3
+	update-alternatives --install /usr/bin/$pack $pack "$dir/bin/$pack" $nr
+}
+
 #####################################################################
 #####################################################################
 ######### java
@@ -156,26 +170,29 @@ fi
 if [[ ! -z "$DO_SCALA" ]]; then
 	echo '######### install scala 2'
 
+	SCALA_URL0='https://github.com/scala/scala/releases'
+	SCALA_REL=$(getLatestRelease $SCALA_URL0)
+	SCALA_REL=${SCALA_REL:1}
+
 	SCALA_URL='https://www.scala-lang.org/download/'
 	SCALA_GET='https://downloads.lightbend.com/scala'
-	SCALA_REL='2.13.4'
+#	SCALA_REL='2.13.5'
 	SCALA_DEF="scala-$SCALA_REL.tgz"
 	SCALA_SRC='scala-*.tgz'
 	SCALA_DRV=$(downloadDriver $SCALA_URL $SCALA_GET/$SCALA_REL/$SCALA_DEF $SCALA_SRC)
 
 	SCALA_DIR='/usr/lib/scala'
 	SCALA_FLR=$(basename $SCALA_DRV .tgz)
-	SCALA_PRI=${SCALA_FLR#scala-}
-	SCALA_PRI=${SCALA_PRI//.}
+	SCALA_PRI=${SCALA_REL//.}
 
 	mkdir -p $SCALA_DIR
 	rm -rf $SCALA_DIR/$SCALA_FLR
 
 	tar -xvzf $SCALA_DRV --directory $SCALA_DIR
 
-	update-alternatives --install /usr/bin/scala  scala  "$SCALA_DIR/$SCALA_FLR/bin/scala"  $SCALA_PRI
-	update-alternatives --install /usr/bin/scalac scalac "$SCALA_DIR/$SCALA_FLR/bin/scalac" $SCALA_PRI
-	update-alternatives --install /usr/bin/scalad scalad "$SCALA_DIR/$SCALA_FLR/bin/scalad" $SCALA_PRI
+	updateAlternatives "$SCALA_DIR/$SCALA_FLR" scala    $SCALA_PRI
+	updateAlternatives "$SCALA_DIR/$SCALA_FLR" scalac   $SCALA_PRI
+	updateAlternatives "$SCALA_DIR/$SCALA_FLR" scaladoc $SCALA_PRI
 fi
 
 #####################################################################
@@ -185,24 +202,24 @@ if [[ ! -z "$DO_DOTTY" ]]; then
 	echo '######### install scala 3'
 
 	DOTTY_URL='https://github.com/lampepfl/dotty/releases'
-	DOTTY_REL='3.0.0-M3'
+	DOTTY_REL=$(getLatestRelease $DOTTY_URL)
+#	DOTTY_REL='3.0.0-M3'
 	DOTTY_DEF="scala3-$DOTTY_REL.zip"
 	DOTTY_SRC='scala3-*.zip'
 	DOTTY_DRV=$(downloadDriver $DOTTY_URL $DOTTY_URL/download/$DOTTY_REL/$DOTTY_DEF $DOTTY_SRC)
 
 	DOTTY_DIR='/usr/lib/scala'
 	DOTTY_FLR=$(basename $DOTTY_DRV .zip)
-	DOTTY_PRI=${DOTTY_FLR#scala3-}
-	DOTTY_PRI=${DOTTY_PRI//[!0-9]}
+	DOTTY_PRI=${DOTTY_REL//[!0-9]}
 
 	mkdir -p $DOTTY_DIR
 	rm -rf $DOTTY_DIR/$DOTTY_FLR
 
 	unzip $DOTTY_DRV -d $DOTTY_DIR
 
-	update-alternatives --install /usr/bin/scala  scala  "$DOTTY_DIR/$DOTTY_FLR/bin/scala"  $DOTTY_PRI
-	update-alternatives --install /usr/bin/scalac scalac "$DOTTY_DIR/$DOTTY_FLR/bin/scalac" $DOTTY_PRI
-	update-alternatives --install /usr/bin/scalad scalad "$DOTTY_DIR/$DOTTY_FLR/bin/scalad" $DOTTY_PRI
+	updateAlternatives "$DOTTY_DIR/$DOTTY_FLR" scala    $DOTTY_PRI
+	updateAlternatives "$DOTTY_DIR/$DOTTY_FLR" scalac   $DOTTY_PRI
+	updateAlternatives "$DOTTY_DIR/$DOTTY_FLR" scaladoc $DOTTY_PRI
 fi
 
 #####################################################################
@@ -221,27 +238,83 @@ fi
 #####################################################################
 #####################################################################
 ######### scala coursier
+# https://get-coursier.io/
+# https://github.com/coursier/coursier
 if [[ ! -z "$DO_COURSIER" ]]; then
 	echo '######### install scala coursier'
 
-	# https://github.com/coursier/coursier/releases/download/v2.0.8/coursier
-	COURSIER_URL='https://github.com/coursier/coursier/releases/download'
-	COURSIER_REL='v2.0.8'
-	COURSIER_DEF="coursier"
-	COURSIER_BIN="Downloads/${COURSIER_DEF}_${COURSIER_REL}"
-	METALS_REL='0.9.8'
+	COURSIER_URL='https://github.com/coursier/coursier/releases'
+	COURSIER_REL=$(getLatestRelease $COURSIER_URL)
+	COURSIER_BIN="Downloads/scala/coursier_${COURSIER_REL}"
+	COURSIER_DST="$HOME_USER/.local/share/coursier"
+	COURSIER_CMD="$COURSIER_DST/bin/coursier"
 
-	sudo -u $SUDO_USER wget "$COURSIER_URL/$COURSIER_REL/$COURSIER_DEF" -O $COURSIER_BIN
+	if [[ -f "$COURSIER_CMD" ]]; then
+		sudo -u $SUDO_USER $COURSIER_CMD update coursier;
+	else
+		sudo -u $SUDO_USER wget "$COURSIER_URL/download/$COURSIER_REL/coursier" -O $COURSIER_BIN;
+		chmod +x $COURSIER_BIN;
+		sudo -u $SUDO_USER $COURSIER_BIN install coursier;
+		addBinToPath '.profile' "$COURSIER_DST/bin" after;
+	fi
 
-	chmod +x $COURSIER_BIN
-	$COURSIER_BIN bootstrap \
-		--java-opt -Xss4m \
-		--java-opt -Xms100m \
-		--java-opt -Dmetals.client=sublime \
-		org.scalameta:metals_2.12:$METALS_REL \
-		-r bintray:scalacenter/releases \
-		-r sonatype:snapshots \
-		-o /usr/local/bin/metals-sublime -f
+	METALS_URL='https://github.com/scalameta/metals/releases'
+	METALS_REL=$(getLatestRelease $METALS_URL)
+	METALS_REL=${METALS_REL:1}
+	$COURSIER_CMD bootstrap \
+	  --java-opt -Xss4m \
+	  --java-opt -Xms100m \
+	  --java-opt -Dmetals.client=sublime \
+	  org.scalameta:metals_2.12:$METALS_REL \
+	  -r bintray:scalacenter/releases \
+	  -r sonatype:snapshots \
+	  -o /usr/local/bin/metals-sublime -f
+fi
+
+#####################################################################
+#####################################################################
+######### scala bloop
+if [[ ! -z "$DO_BLOOP" ]]; then
+	echo '######### install scala bloop server'
+
+	COURSIER_DST="$HOME_USER/.local/share/coursier"
+	COURSIER_CMD="$COURSIER_DST/bin/coursier"
+
+	if [[ ! -f "$COURSIER_CMD" ]]; then
+		echo "missing coursier!!!"
+		exit 1
+	fi
+
+	if $COURSIER_CMD list | grep bloop; then
+		sudo -u $SUDO_USER $COURSIER_CMD update bloop
+	else
+		sudo -u $SUDO_USER $COURSIER_CMD install bloop
+	fi
+
+	BLOOP_SRV="$COURSIER_DST/sysetmd/bloop.service"
+	sudo -u $SUDO_USER mkdir "$COURSIER_DST/sysetmd"
+	if [[ ! -f "$BLOOP_SRV" ]]; then
+		cat <<- EOT | sudo -u $SUDO_USER tee $BLOOP_SRV > /dev/null
+			[Unit]
+			Description=Bloop Scala build server
+
+			[Service]
+			ExecStart=$COURSIER_DST/bin/bloop server
+			StandardOutput=journal
+			StandardError=journal
+			SyslogIdentifier=bloop
+
+			[Install]
+			WantedBy=default.target
+		EOT
+	fi
+
+	if sudo -u $SUDO_USER systemctl is-active bloop ; then
+		sudo -u $SUDO_USER systemctl --user stop bloop
+		sudo -u $SUDO_USER systemctl --user disable $BLOOP_SRV
+	fi
+	sudo -u $SUDO_USER systemctl --user enable $BLOOP_SRV
+	sudo -u $SUDO_USER systemctl --user start bloop
 fi
 
 #####################################################################
