@@ -129,6 +129,8 @@ HOME_USER="/home/$SUDO_USER"
 SOURCES='/etc/apt/sources.list'
 SOURCES_DIR='/etc/apt/sources.list.d'
 
+KEY_RING_DIR='/usr/share/keyrings'
+
 THIS_NAME=game
 THIS_IP=192.168.0.20
 THIS_DNS=192.168.0.10
@@ -282,13 +284,13 @@ function installLib() {
 }
 
 function listFile() {
-	ls -t Downloads/$1 2>/dev/null | head -1
+	ls -t $HOME_USER/Downloads/$1 2>/dev/null | head -1
 }
 
 # downloadDriver download-url default-url search-mask dst-name
 function downloadDriver() {
 	if [[ ! -z "$4" ]]; then
-		rm -f Downloads/$4
+		rm -f $HOME_USER/Downloads/$4
 	fi
 	local searchObj=$(listFile $3)
 	if [[ ! -z "$2" ]] && [[ ! -f "$searchObj" ]]; then
@@ -338,13 +340,21 @@ function addPgpKey() {
 	if [[ -z "$gpgServer" ]]; then 			# old version
 		wget -nv $gpgFile -O - | apt-key add -
 	elif [[ -z "$gpgKey" ]]; then 			# new version
-		wget -nv $gpgServer -O - | gpg --no-default-keyring --keyring /tmp/$gpgFile --import
-		gpg --export --keyring /tmp/$gpgFile > /etc/apt/trusted.gpg.d/$gpgFile
-	else 												# use a key server
-		gpg --no-default-keyring --keyring /tmp/$gpgFile --keyserver $gpgServer --recv-keys $gpgKey
+		wget -nv $gpgServer -O - | gpg --no-default-keyring --keyring temp-keyring.gpg --import
+		gpg --no-default-keyring --keyring temp-keyring.gpg --export --output $KEY_RING_DIR/$gpgFile
+		rm temp-keyring.gpg
+
+		#wget -nv $gpgServer -O - | gpg --no-default-keyring --keyring $KEY_RING_DIR/$gpgFile --import
+		#gpg --no-default-keyring --keyring $KEY_RING_DIR/$gpgFile --export > /etc/apt/trusted.gpg.d/$gpgFile
+	else 												        # use a key server
+		gpg --no-default-keyring --keyring $KEY_RING_DIR/$gpgFile --keyserver $gpgServer --recv-keys $gpgKey
 #		gpg --ignore-time-conflict --no-options --no-default-keyring --secret-keyring /tmp/tmp.rh1myoBdSE --trustdb-name /etc/apt/trustdb.gpg --keyring /etc/apt/trusted.gpg --primary-keyring /etc/apt/trusted.gpg --keyserver keyserver.ubuntu.com --recv 7F0CEB10
-		gpg --export --keyring /tmp/$gpgFile > /etc/apt/trusted.gpg.d/$gpgFile
+		gpg --export --keyring $KEY_RING_DIR/$gpgFile > /etc/apt/trusted.gpg.d/$gpgFile
 	fi
+}
+
+function getLatestRelease() {
+	curl --silent "$1/latest" | sed -E 's|.*/tag/([^"]+).*|\1|'
 }
 
 #####################################################################
@@ -1038,7 +1048,7 @@ if [[ ! -z "$DO_VIRTUAL_BOX" ]]; then
 #  dpkg -i virtualbox-ext-pack_6.1.0-1_all.deb
 
 #  addPgpKey 'oracle.gpg' 'https://www.virtualbox.org/download/oracle_vbox_2016.asc'
-#  echo 'deb https://download.virtualbox.org/virtualbox/debian buster contrib' > $SOURCES_DIR/virtualbox.list
+#  echo "deb [signed-by=$KEY_RING_DIR/oracle.gpg] https://download.virtualbox.org/virtualbox/debian buster contrib" > $SOURCES_DIR/virtualbox.list
 #  apt update
 
 	apt install virtualbox/sid    # found at debian sid repository
@@ -1120,7 +1130,7 @@ if [[ ! -z "$DO_WINE" ]]; then
 	# repositories and images created with the Open Build Service
 	# OBS_URL='https://download.opensuse.org/repositories/Emulators:/Wine:/Debian/Debian_Testing_standard'
 	# addPgpKey 'wine.gpg' "https://$OBS_URL/Release.key"
-	# echo 'deb http://$OBS_URL ./' > $SOURCES_DIR/wine-obs.list
+	# echo 'deb [signed-by=$KEY_RING_DIR/wine.gpg] http://$OBS_URL ./' > $SOURCES_DIR/wine-obs.list
 	# apt update
 
 	# LIB_SDL=libsdl2-2.0-0_2.0.10+dfsg1-1_amd64.deb
@@ -1139,7 +1149,7 @@ if [[ ! -z "$DO_WINE" ]]; then
 
 	WINE_BUILDS='https://dl.winehq.org/wine-builds'
 	addPgpKey 'wineHQ.gpg' "$WINE_BUILDS/winehq.key"
-	echo "deb $WINE_BUILDS/debian/ bullseye main" > $SOURCES_DIR/wine.list
+	echo "deb [signed-by=$KEY_RING_DIR/wineHQ.gpg] $WINE_BUILDS/debian/ bullseye main" > $SOURCES_DIR/wine.list
 	# echo "deb $WINE_BUILDS/debian/ testing  main" > $SOURCES_DIR/wine.list # <-- broken, not working
 	apt update
 
@@ -1198,8 +1208,8 @@ if [[ ! -z "$DO_STEAM" ]]; then
 #	addPgpKey 'steam.gpg' "$STEAM_BUILDS/archive/stable/steam.gpg"
 	addPgpKey 'steam.gpg' "$STEAM_BUILDS/archive/precise/steam.gpg"
 	cat <<- EOT > $SOURCES_DIR/steam.list
-		deb     [arch=amd64,i386] $STEAM_BUILDS stable steam
-		deb-src [arch=amd64,i386] $STEAM_BUILDS stable steam
+		deb     [signed-by=$KEY_RING_DIR/steam.gpg] $STEAM_BUILDS stable steam
+		deb-src [signed-by=$KEY_RING_DIR/steam.gpg] $STEAM_BUILDS stable steam
 	EOT
 
 	apt update
@@ -1221,7 +1231,7 @@ if [[ ! -z "$DO_LUTRIS" ]]; then
 	echo '######### install Lutris'
 	LUTRIS_URL='https://download.opensuse.org/repositories/home:/strycore/Debian_Testing'
 	addPgpKey 'lutris.gpg' "$LUTRIS_URL/Release.key"
-	echo "deb $LUTRIS_URL/ ./" > $SOURCES_DIR/lutris.list
+	echo "deb [signed-by=$KEY_RING_DIR/lutris.gpg] $LUTRIS_URL/ ./" > $SOURCES_DIR/lutris.list
 	apt update
 	apt install lutris
 	apt install gamemode
@@ -1261,15 +1271,17 @@ fi
 if [[ ! -z "$DO_MULTI_MC" ]]; then
 	echo '######### install Minecraft MultiMC'
 
-	apt install qt5-default
+	#apt install qt5-default
+	apt install libqt5xml5
 
 	MULTIMC_URL='https://multimc.org'
-	MULTIMC_REL='1.4-1'
+	MULTIMC_REL='1.5-1'
 	MULTIMC_DEF="multimc_$MULTIMC_REL.deb"
 	MULTIMC_SRC='multimc_*.deb'
 	MULTIMC_DRV=$(downloadDriver $MULTIMC_URL $MULTIMC_URL/download/$MULTIMC_DEF $MULTIMC_SRC)
 
-	dpkg -i $MULTIMC_DRV
+	dpkg --force-depends -i $MULTIMC_DRV
+	#apt install multimc
 fi
 
 #####################################################################
@@ -1402,7 +1414,7 @@ if [[ ! -z "$DO_SPOTIFY" ]]; then
 
 	addPgpKey 'spotify.gpg' 'https://download.spotify.com/debian/pubkey.gpg'
 #	echo deb 'https://repository.spotify.com stable non-free' > $SOURCES_DIR/spotify.list
-	echo deb 'https://repository.scdn.co stable non-free' > $SOURCES_DIR/spotify.list
+	echo "deb [signed-by=$KEY_RING_DIR/spotify.gpg] https://repository.scdn.co stable non-free" > $SOURCES_DIR/spotify.list
 	apt update
 
 	apt install spotify-client
@@ -1462,7 +1474,8 @@ if [[ ! -z "$DO_CHATTY" ]]; then
 	apt install default-jre
 
 	CHATTY_URL='https://github.com/chatty/chatty/releases'
-	CHATTY_REL='0.14-b2'
+	CHATTY_REL=$(getLatestRelease $CHATTY_URL)
+	CHATTY_REL=${CHATTY_REL:1}
 	CHATTY_DEF="Chatty_$CHATTY_REL.zip"
 	CHATTY_SRC='Chatty_*.zip'
 	CHATTY_DRV=$(downloadDriver $CHATTY_URL $CHATTY_URL/download/v$CHATTY_REL/$CHATTY_DEF $CHATTY_SRC)
@@ -1807,7 +1820,7 @@ if [[ ! -z "$DO_ETCHER" ]]; then
 	echo '######### install Etcher.io'
 
 	addPgpKey 'etcher.gpg' 'hkps://keyserver.ubuntu.com:443' '379CE192D401AB61'
-	echo "deb 'https://deb.etcher.io' stable etcher" > $SOURCES_DIR/etcher.list
+	echo "deb [signed-by=$KEY_RING_DIR/etcher.gpg] https://deb.etcher.io stable etcher" > $SOURCES_DIR/etcher.list
 
 	apt update
 	apt install balena-etcher-electron
@@ -1874,10 +1887,17 @@ fi
 if [[ ! -z "$DO_TEST" ]]; then
 	echo 'nothing here for now'
 
-	cat <<- EOT > '/tmp/test.txt'
-		game       IN A 192.168.0.20
-		work       IN A 192.168.0.30
-	EOT
-#	isoInstallWindows10 $BRIDGE
+  LUTRIS_URL='https://download.opensuse.org/repositories/home:/strycore/Debian_Testing'
+	#addPgpKey 'lutris.gpg' "$LUTRIS_URL/Release.key"
+
+	gpgFile='lutris.gpg'
+	gpgServer="$LUTRIS_URL/Release.key"
+
+  #gpg --no-default-keyring --keyring /usr/share/keyrings/$gpgFile --keyserver <hkp://keyserver.ubuntu.com:80> --recv-keys <fingerprint>
+  #gpg --no-default-keyring --keyring /usr/share/keyrings/$gpgFile --import
+	wget -nv $gpgServer -O - | gpg --no-default-keyring --keyring /usr/share/keyrings/$gpgFile --import
+	#wget -nv $gpgServer -O - | gpg --dearmor > /usr/share/keyrings/$gpgFile
+	#gpg --export                      --keyring /usr/share/keyrings/$gpgFile > /etc/apt/trusted.gpg.d/$gpgFile
+	gpg --export --no-default-keyring --keyring /usr/share/keyrings/$gpgFile > /etc/apt/trusted.gpg.d/$gpgFile
 
 fi
