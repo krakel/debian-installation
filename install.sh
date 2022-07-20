@@ -35,6 +35,8 @@ Commands:
   iso       install a iso
   virtual   VirtualBox with SID library (removed from debian testing)
   anbox     Anbox, a Android Emulator (very alpha)
+  rdp       remote desktop
+  express   ExpressVPN
 
   wine      Wine
   steam     Steam
@@ -73,6 +75,7 @@ declare -A SELECT=(
 	[dream]=DO_DREAMBOX_EDIT
 	[dxvk]=DO_DXVK
 	[etcher]=DO_ETCHER
+	[express]=DO_EXPRESS
 	[gpic]=DO_GPIC
 	[iso]=DO_ISO
 	[kvm]=DO_KVM
@@ -86,6 +89,7 @@ declare -A SELECT=(
 	[nvidia]=DO_NVIDIA
 	[ohmyz]=DO_OHMYZ
 	[pwsafe]=DO_PASSWORD_SAFE
+	[rdp]=DO_RDP
 	[samba]=DO_SAMBA
 	[screen]=DO_SCREENSAVER
 	[snap]=DO_SNAPSHOT
@@ -289,22 +293,27 @@ function listFile() {
 
 # downloadDriver download-url default-url search-mask dst-name
 function downloadDriver() {
-	if [[ ! -z "$4" ]]; then
-		rm -f $HOME_USER/Downloads/$4
+	local drvServer=$1
+	local drvUrl=$2
+	local drvMask=$3
+	local drvName=$4
+
+	if [[ ! -z "$drvName" ]]; then
+		rm -f $HOME_USER/Downloads/$drvName
 	fi
-	local searchObj=$(listFile $3)
-	if [[ ! -z "$2" ]] && [[ ! -f "$searchObj" ]]; then
-		if [[ -z "$4" ]]; then
-			sudo -u $SUDO_USER wget -P Downloads $2
+	local searchObj=$(listFile $drvMask)
+	if [[ ! -z "$drvUrl" ]] && [[ ! -f "$searchObj" ]]; then
+		if [[ -z "$drvName" ]]; then
+			sudo -u $SUDO_USER wget -P Downloads $drvUrl
 		else
-			sudo -u $SUDO_USER wget -P Downloads $2 -c $4
+			sudo -u $SUDO_USER wget -P Downloads $drvUrl -c $drvName
 		fi
-		searchObj=$(listFile $3)
+		searchObj=$(listFile $drvMask)
 	fi
-	if [[ ! -z "$1" ]] && [[ ! -f "$searchObj" ]]; then
-		sudo -u $SUDO_USER bash -c "DISPLAY=:0.0 x-www-browser $1"
+	if [[ ! -z "$drvServer" ]] && [[ ! -f "$searchObj" ]]; then
+		sudo -u $SUDO_USER bash -c "DISPLAY=:0.0 x-www-browser $drvServer"
 		read -p "Press [Enter] key to continue if you finished the download of the latest driver to '~/Downloads/'"
-		searchObj=$(listFile $3)
+		searchObj=$(listFile $drvMask)
 	fi
 	if [[ ! -f "$searchObj" ]]; then
 		echo 'missing driver!'
@@ -1115,6 +1124,14 @@ if [[ ! -z "$DO_ANBOX" ]]; then
 fi
 
 #####################################################################
+#####################################################################
+######### Remmina RDP
+if [[ ! -z "$DO_RDP" ]]; then
+	echo '######### install Remina'
+	apt install remmina remmina-plugin-vnc
+fi
+
+#####################################################################
 # Gaming
 #####################################################################
 
@@ -1412,9 +1429,8 @@ fi
 if [[ ! -z "$DO_SPOTIFY" ]]; then
 	echo '######### install Spotify'
 
-	addPgpKey 'spotify.gpg' 'https://download.spotify.com/debian/pubkey.gpg'
-#	echo deb 'https://repository.spotify.com stable non-free' > $SOURCES_DIR/spotify.list
-	echo "deb [signed-by=$KEY_RING_DIR/spotify.gpg] https://repository.scdn.co stable non-free" > $SOURCES_DIR/spotify.list
+	addPgpKey 'spotify.gpg' 'hkps://keyserver.ubuntu.com:443' '5E3C45D7B312C643'
+	echo "deb [signed-by=$KEY_RING_DIR/spotify.gpg] http://repository.spotify.com stable non-free" > $SOURCES_DIR/spotify.list
 	apt update
 
 	apt install spotify-client
@@ -1813,6 +1829,23 @@ if [[ ! -z "$DO_VIEWNIOR" ]]; then
 	echo '######### install Viewnior'
 	apt install viewnior
 fi
+
+#####################################################################
+#####################################################################
+######### Express VPN
+if [[ ! -z "$DO_EXPRESS" ]]; then
+	echo '######### install ExpressVPN'
+
+	VPN_URL='https://www.expressvpn.works/clients/linux'
+	VPN_REL='3.28.0.6-1'
+	VPN_DEF="expressvpn_${VPN_REL}_amd64.deb"
+	VPN_SRC='expressvpn_*.deb'
+
+	VPN_DRV=$(downloadDriver "" $VPN_URL/download/$VPN_DEF $VPN_SRC)
+
+	dpkg --force-depends -i $VPN_DRV
+fi
+
 
 #####################################################################
 #####################################################################
