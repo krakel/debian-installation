@@ -30,6 +30,7 @@ Commands:
   tools     xfce tools
   etcher    bootable USB drives or SD cards
   unet      bootable USB drives or SD cards
+  autofs    auto mount usb device
 
   kvm       KVM, QEMU with Virt-Manager (1 reboot)
   iso       install a iso
@@ -55,6 +56,7 @@ Commands:
 
   gpic      GPicview image viewer
   viewnior  Viewnior image viewer
+  mirage    Mirage image viewer (best)
 
   login     Autologin
   moka      nice icon set
@@ -66,6 +68,7 @@ declare -A SELECT=(
 	[agent]=DO_SSH_AGENT
 	[amd]=DO_AMD
 	[anbox]=DO_ANBOX
+	[autofs]=DO_AUTOFS
 	[chatty]=DO_CHATTY
 	[cifs]=DO_CIFS
 	[cifsk]=DO_CIFS_KVM
@@ -81,6 +84,7 @@ declare -A SELECT=(
 	[kvm]=DO_KVM
 	[login]=DO_AUTO_LOGIN
 	[lutris]=DO_LUTRIS
+	[mirage]=DO_MIRAGE
 	[moka]=DO_MOKA
 	[mozilla]=DO_MOZILLA
 	[multimc]=DO_MULTI_MC
@@ -304,9 +308,9 @@ function downloadDriver() {
 	local searchObj=$(listFile $drvMask)
 	if [[ ! -z "$drvUrl" ]] && [[ ! -f "$searchObj" ]]; then
 		if [[ -z "$drvName" ]]; then
-			sudo -u $SUDO_USER wget -P Downloads $drvUrl
+			sudo -u $SUDO_USER wget -P Downloads $drvUrl -O
 		else
-			sudo -u $SUDO_USER wget -P Downloads $drvUrl -c $drvName
+			sudo -u $SUDO_USER wget -P Downloads $drvUrl -O -c $drvName
 		fi
 		searchObj=$(listFile $drvMask)
 	fi
@@ -1832,6 +1836,14 @@ fi
 
 #####################################################################
 #####################################################################
+######### Mirage image viewer
+if [[ ! -z "$DO_MIRAGE" ]]; then
+	echo '######### install Mirage'
+	apt install mirage
+fi
+
+#####################################################################
+#####################################################################
 ######### Express VPN
 if [[ ! -z "$DO_EXPRESS" ]]; then
 	echo '######### install ExpressVPN'
@@ -1857,6 +1869,32 @@ if [[ ! -z "$DO_ETCHER" ]]; then
 
 	apt update
 	apt install balena-etcher-electron
+fi
+
+#####################################################################
+#####################################################################
+if [[ ! -z "$DO_AUTOFS" ]]; then
+	echo '######### install autofs'
+
+	apt update
+	apt install autofs
+
+	mkdir -p /mnt/autofs/usb/backup
+
+	lsblk
+	blkid -o list -w /dev/null
+
+	exit 0
+
+	AUTO_KEY=sda1
+	AUTO_TYPE=$(blkid -o value -s TYPE /dev/$AUTO_KEY)
+	AUTO_UUID=$(blkid -o value -s UUID /dev/$AUTO_KEY)
+
+	cat <<- EOT > "/etc/auto.usb"
+		backup   -fstype=$AUTO_TYPE   UUID=$AUTO_UUID
+	EOT
+
+	systemctl restart autofs.service
 fi
 
 #####################################################################
