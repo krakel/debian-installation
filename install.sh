@@ -50,6 +50,8 @@ Commands:
   discord   Discord
   dream     Dreambox Edit
   mozilla   Firefox + Thunderbird
+  firefox   Firefox move profile
+  thunder   Thunderbird move profile
   spotify   Spotify, some music
   twitch    twitch gui
   video     VideoLan
@@ -79,6 +81,8 @@ declare -A SELECT=(
 	[dxvk]=DO_DXVK
 	[etcher]=DO_ETCHER
 	[express]=DO_EXPRESS
+	[firefox]=DO_FIREFOX
+	[thunder]=DO_THUNDER
 	[gpic]=DO_GPIC
 	[iso]=DO_ISO
 	[kvm]=DO_KVM
@@ -141,7 +145,7 @@ KEY_RING_DIR='/usr/share/keyrings'
 
 THIS_NAME=game
 THIS_IP=192.168.0.20
-THIS_DNS=192.168.0.10
+THIS_DNS=192.168.0.1
 THIS_DEF=192.168.0.1
 THIS_DOMAIN='at-home'
 
@@ -488,6 +492,8 @@ if [[ ! -z "$DO_TOOLS" ]]; then
 	apt install gparted       # graphical device manager
 	apt install menulibre     # menu editor
 	apt install fonts-noto    # nice font
+	apt install fonts-clear-sans
+	apt install imagemagick
 	apt autoremove
 
 	CLEAR_SANS_URL='https://www.fontsquirrel.com/fonts/download/clear-sans'
@@ -1170,7 +1176,7 @@ if [[ ! -z "$DO_WINE" ]]; then
 
 	WINE_BUILDS='https://dl.winehq.org/wine-builds'
 	addPgpKey 'wineHQ.gpg' "$WINE_BUILDS/winehq.key"
-	echo "deb [signed-by=$KEY_RING_DIR/wineHQ.gpg] $WINE_BUILDS/debian/ bullseye main" > $SOURCES_DIR/wine.list
+	echo "deb [signed-by=$KEY_RING_DIR/wineHQ.gpg] $WINE_BUILDS/debian/ bookworm main" > $SOURCES_DIR/wine.list
 	# echo "deb $WINE_BUILDS/debian/ testing  main" > $SOURCES_DIR/wine.list # <-- broken, not working
 	apt update
 
@@ -1362,66 +1368,83 @@ fi
 if [[ ! -z "$DO_MOZILLA" ]]; then
 	echo '######### install Firefox + Thunderbird'
 
-	function mozillaCopyProfile() {
-		local profileZIP=$1
-		local profileLIN=$2
-		local profileWIN=$3
-		local profileOLD="$profileLIN/win10profile"
-		local profileINI="$profileLIN/profiles.ini"
-
-		if [[ -d "$profileOLD" ]]; then
-			echo 'windows profile already exist'
-			return
-		fi
-
-		sudo -u $SUDO_USER mkdir -p $profileOLD
-
-		if [[ -d "$profileWIN" ]]; then
-			local winProf=$(grep "StartWithLastProfile" $profileWIN/profiles.ini | cut -d '=' -f 2 | tr -d '\r')
-			local pathProf=$(grep -m${winProf:-1} -F '[Profile' $profileWIN/profiles.ini -A 3 | grep "Path" | cut -d '=' -f 2 | tr -d '\r')
-			if [[ -z "$pathProf" ]]; then
-				echo 'missing profile path entry'
-				return
-			fi
-			echo "cp -f -r $profileWIN/$pathProf/* $profileOLD"
-			sudo -u $SUDO_USER cp -f -r $profileWIN/$pathProf/* $profileOLD
-		elif [[ -f "$profileZIP" ]]; then
-			sudo -u $SUDO_USER unzip $profileZIP -d $pprofileOLD
-		else
-			echo 'missing copy of Windows profile'
-			return
-		fi
-
-		if [[ ! -f "$profileINI" ]]; then
-			cat <<- EOT | sudo -u $SUDO_USER tee $profileINI > /dev/null
-				[General]
-				StartWithLastProfile=0
-				Version=2
-			EOT
-		fi
-		sudo -u $SUDO_USER sed -i '0,/StartWithLastProfile=[0-9]*/s//StartWithLastProfile=0/' $profileINI
-		if ! grep -F -q 'win10profile' $profileINI ; then
-			cat <<- EOT | sudo -u $SUDO_USER tee -a $profileINI > /dev/null
-				[Profile1]
-				Name=win10profile
-				IsRelative=1
-				Path=win10profile
-			EOT
-		fi
-	}
-
 	apt remove --purge iceweasel
 
 	apt install -t unstable firefox
 	apt install -t unstable thunderbird
+fi
+
+
+function mozillaCopyProfile() {
+	local profileZIP=$1
+	local profileLIN=$2
+	local profileWIN=$3
+	local profileOLD="$profileLIN/win10profile"
+	local profileINI="$profileLIN/profiles.ini"
+
+	if [[ -d "$profileOLD" ]]; then
+		echo 'windows profile already exist'
+		return
+	fi
+
+	sudo -u $SUDO_USER mkdir -p $profileOLD
+
+	if [[ -d "$profileWIN" ]]; then
+		local winProf=$(grep "StartWithLastProfile" $profileWIN/profiles.ini | cut -d '=' -f 2 | tr -d '\r')
+		local pathProf=$(grep -m${winProf:-1} -F '[Profile' $profileWIN/profiles.ini -A 3 | grep "Path" | cut -d '=' -f 2 | tr -d '\r')
+		if [[ -z "$pathProf" ]]; then
+			echo 'missing profile path entry'
+			return
+		fi
+		echo "cp -f -r $profileWIN/$pathProf/* $profileOLD"
+		sudo -u $SUDO_USER cp -f -r $profileWIN/$pathProf/* $profileOLD
+	elif [[ -f "$profileZIP" ]]; then
+		sudo -u $SUDO_USER unzip $profileZIP -d $pprofileOLD
+	else
+		echo 'missing copy of Windows profile'
+		return
+	fi
+
+	if [[ ! -f "$profileINI" ]]; then
+		cat <<- EOT | sudo -u $SUDO_USER tee $profileINI > /dev/null
+			[General]
+			StartWithLastProfile=0
+			Version=2
+		EOT
+	fi
+	sudo -u $SUDO_USER sed -i '0,/StartWithLastProfile=[0-9]*/s//StartWithLastProfile=0/' $profileINI
+	if ! grep -F -q 'win10profile' $profileINI ; then
+		cat <<- EOT | sudo -u $SUDO_USER tee -a $profileINI > /dev/null
+			[Profile0]
+			Name=win10profile
+			IsRelative=1
+			Path=win10profile
+
+			[General]
+			StartWithLastProfile=1
+		EOT
+	fi
+}
+
+#####################################################################
+#####################################################################
+######### Firefox Profile
+if [[ ! -z "$DO_FIREFOX" ]]; then
 
 	FIREFOX_WINDOWS="/mnt/work_c/Users/$WIN_USER/AppData/Roaming/Mozilla/Firefox"
 	FIREFOX_LINUX="$HOME_USER/.mozilla/firefox"
 
+	mozillaCopyProfile 'Download/firefox.zip'     $FIREFOX_LINUX     $FIREFOX_WINDOWS
+fi
+
+#####################################################################
+#####################################################################
+######### Thunderbird Profile
+if [[ ! -z "$DO_THUNDER" ]]; then
+
 	THUNDERBIRD_WINDOWS="/mnt/work_c/Users/$WIN_USER/AppData/Roaming/Thunderbird"
 	THUNDERBIRD_LINUX="$HOME_USER/.thunderbird"
 
-	mozillaCopyProfile 'Download/firefox.zip'     $FIREFOX_LINUX     $FIREFOX_WINDOWS
 	mozillaCopyProfile 'Download/thunderbird.zip' $THUNDERBIRD_LINUX $THUNDERBIRD_WINDOWS
 fi
 
