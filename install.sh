@@ -53,6 +53,7 @@ Commands:
   firefox   Firefox move profile
   thunder   Thunderbird move profile
   spotify   Spotify, some music
+  chrome    Google Chrome
   twitch    twitch gui
   video     VideoLan
 
@@ -72,6 +73,7 @@ declare -A SELECT=(
 	[anbox]=DO_ANBOX
 	[autofs]=DO_AUTOFS
 	[chatty]=DO_CHATTY
+	[chrome]=DO_CHROME
 	[cifs]=DO_CIFS
 	[cifsk]=DO_CIFS_KVM
 	[conky]=DO_CONKY
@@ -494,6 +496,7 @@ if [[ ! -z "$DO_TOOLS" ]]; then
 	apt install fonts-noto    # nice font
 	apt install fonts-clear-sans
 	apt install imagemagick
+	apt install youtube-dl
 	apt autoremove
 
 	CLEAR_SANS_URL='https://www.fontsquirrel.com/fonts/download/clear-sans'
@@ -1461,6 +1464,20 @@ if [[ ! -z "$DO_SPOTIFY" ]]; then
 	apt update
 
 	apt install spotify-client
+fi
+
+#####################################################################
+#####################################################################
+######### Spotify
+if [[ ! -z "$DO_CHROME" ]]; then
+	echo '######### install Google Chrome'
+	apt install software-properties-common apt-transport-https wget ca-certificates gnupg2
+
+	addPgpKey 'chrome.gpg' 'https://dl.google.com/linux/linux_signing_key.pub'
+	echo "deb [arch=amd64 signed-by=$KEY_RING_DIR/chrome.gpg] http://dl.google.com/linux/chrome/deb/ stable main" > $SOURCES_DIR/chrome.list
+	apt update
+
+	apt install google-chrome-stable
 fi
 
 #####################################################################
