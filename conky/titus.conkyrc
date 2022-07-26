@@ -153,7 +153,6 @@ ${color2}Kernel:${color}${alignr}${exec uname} ${exec uname -r}
 ${color2}IP Address: ${color} ${alignr}${addrs bridge0}
 ${color5}${font}P R O C E S S O R S  ${hr 2}${font}${color}
 ${color2}CPU Freq:${color} $alignr${freq} MHz
-${color2}CPU Temp:${color} $alignr${execi 10 sensors | grep 'Tctl' | awk {'print $2'}}
 ${color2}History:${color} ${alignr}${cpugraph 8,100}
 ${color2}Top Processes${goto 222}cpu%${goto 274}mem%${color}
 ${voffset 4}     1  -  ${top name 1}${alignr}${goto 170} ${goto 222}${top cpu 1} ${goto 274}${top mem 1}
@@ -177,7 +176,6 @@ ${color2}data:${color}${alignr}${fs_used /home/uwe/Data} / ${fs_size /home/uwe/D
 ${color5}${font}G R A P H I C   ${hr 2}${font}${color}
 ${color2}GPU:${color} ${alignr}${execp lspci | grep ' VGA ' | cut -d" " -f 12-15  | awk '{ print substr( $0, 2, length($0)-2 ) }'}
 #${color2}Driver:${color} ${alignr}${execi 60000 nvidia-smi | grep "Driver Version"| awk {'print $3'}}
-${color2}GPU Temp:${color} ${alignr}${hwmon 2 temp 2} °C
 #${color2}Fan Speed:${color} ${alignr}${execi 60 nvidia-settings -q [fan:0]/GPUCurrentFanSpeed -t} %
 #${color2}GPU Clock:${color} ${alignr}${execi 60 nvidia-settings -q GPUCurrentClockFreqs | grep -m 1 Attribute | awk '{print $4}' | sed -e 's/\.//' | cut -d, -f1} MHz
 #${color2}Mem Clock:${color} ${alignr}${execi 86400 nvidia-settings -q all | grep -m 1 GPUCurrentProcessorClockFreqs | awk '{print $4}' | sed 's/.$//'} MHz
@@ -188,6 +186,11 @@ ${color2}Mem Used:${color} ${alignr}${execi 60 numfmt --to=iec < /sys/class/drm/
 #${color1}Mem clk${color} ${exec grep -Po '\d+:\s\K(\d+)(?=.*\*$)' /sys/class/drm/card0/device/pp_dpm_mclk}
 #${color1}Mem${color}     ${exec numfmt --to=iec < /sys/class/drm/card0/device/mem_info_vram_used}
 #${color1}Fan${color}     ${hwmon 2 fan 1}
+${color5}${font}T E M P E R A T U R   ${hr 2}${font}${color}
+${color2}CPU:${color} $alignr${execi 10 sensors | grep 'Tctl' | awk {'print $2'}}
+${color2}GPU:${color} ${alignr}${hwmon 2 temp 2} °C
+${color2}NVM root:${color}${alignr}${exec sudo /usr/sbin/nvme smart-log /dev/nvme0n1 | grep "^temperature" | cut -c18-19} °C${alignr}
+${color2}NVM data:${color}${alignr}${exec sudo /usr/sbin/nvme smart-log /dev/nvme1n1 | grep "^temperature" | cut -c18-19} °C${alignr}
 ${color5}${font}W E A T H E R   ${hr 2}${font}${color}
 ${font Dejavu Sans Mono:size=10}${alignc}${color}${execpi 300 curl wttr.in/Nandlstadt?T0 --silent --max-time 3}${font}
 ]];
