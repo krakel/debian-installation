@@ -1,0 +1,168 @@
+#!/bin/bash
+
+# insertPathFkts file
+function insertPathFkts() {
+	if ! grep -F -q 'path_add()' $1 ; then
+		cat <<- 'EOT' | sudo -u $SUDO_USER tee -a $1 > /dev/null
+
+			path_add() {
+			  NEW_ELEMENT=${1%/}
+			  if [ -d "$1" ] && ! echo $PATH | grep -E -q "(^|:)$NEW_ELEMENT(:|$)" ; then
+			    if [ "$2" = "after" ] ; then
+			      PATH="$PATH:$NEW_ELEMENT"
+			    else
+			      PATH="$NEW_ELEMENT:$PATH"
+			    fi
+			  fi
+			}
+
+			path_rm() {
+			  PATH="$(echo $PATH | sed -e 's;\(^\|:\)${1%/}\(:\|\$\);\1\2;g' -e 's;^:\|:$;;g' -e 's;::;:;g')"
+			}
+		EOT
+		# dont forget 'export PATH'
+	fi
+}
+
+# addBinToPath file path <after>
+function addBinToPath() {
+	insertPathFkts $1
+	local addPathStr="path_add '$2'"
+
+	if ! grep -F -q "$addPathStr" $1 ; then
+		echo "add '$2' to '$1'"
+		cat <<- EOT | sudo -u $SUDO_USER tee -a $1 > /dev/null
+
+			$addPathStr $3
+			export PATH
+		EOT
+	else
+		echo "'$1' already contain '$addPathStr'!"
+	fi
+}
+
+# addExportEnv file env value
+function addExportEnv() {
+	insertPathFkts $1
+	local exportStr="export $2=\"$3\""
+
+	if ! grep -F -q "$exportStr" $1 ; then
+		echo "add '$exportStr' to '$1'"
+		cat <<- EOT | sudo -u $SUDO_USER tee -a $1 > /dev/null
+
+			$exportStr
+		EOT
+	else
+		echo "'$1' already contain '$exportStr'!"
+	fi
+}
+
+# addCommand file cmd
+function addCommand() {
+	local commandStr="$2"
+
+	if ! grep -F -q "$commandStr" $1 ; then
+		echo "add '$commandStr' to '$1'"
+		cat <<- EOT | sudo -u $SUDO_USER tee -a $1 > /dev/null
+
+			$commandStr
+		EOT
+	else
+		echo "'$1' already contain '$commandStr'!"
+	fi
+}
+
+function addSudoComplete() {
+	if ! grep -F -q 'complete -cf sudo' $1 ; then
+		cat <<- 'EOT' | sudo -u $SUDO_USER tee -a $1 > /dev/null
+
+			if [ "$PS1" ]; then
+			  complete -cf sudo
+			fi
+		EOT
+	fi
+
+}
+
+# installLib lib-name
+function installLib() {
+	ldconfig -p | grep -F "$1"
+	if [[ "$?" != "0" ]]; then
+		apt install $1
+		apt autoremove
+	fi
+}
+
+function listFile() {
+	ls -t $HOME_USER/$1 2>/dev/null | head -1
+}
+
+# downloadDriver server default mask name folder
+function downloadDriver() {
+	local server=$1
+	local url=$2
+	local mask=$3
+	local name=$4
+	local folder=$5
+
+	if [[ -z "$folder" ]]; then
+		local dst='Downloads'
+	else
+		local dst="Downloads/$folder"
+	fi
+	if [[ ! -z "$name" ]]; then
+		rm -f $HOME_USER/$dst/$name
+	fi
+	local searchObj=$(listFile $dst/$mask)
+	if [[ ! -z "$url" ]] && [[ ! -f "$searchObj" ]]; then
+		if [[ -z "$name" ]]; then
+			sudo -u $SUDO_USER wget -q -P $dst $url
+		else
+			sudo -u $SUDO_USER wget -q -c $dst/$name $url
+		fi
+		searchObj=$(listFile $dst/$mask)
+	fi
+	if [[ ! -z "$server" ]] && [[ ! -f "$searchObj" ]]; then
+		echo "please download driver from $server and save at '~/$dst/'"
+	fi
+	if [[ ! -f "$searchObj" ]]; then
+		echo 'missing driver!'
+		exit 1
+	fi
+	echo $searchObj
+}
+
+function createDesktopEntry() {
+	local entryName=$1
+	shift
+
+	cat $@ | sudo -u $SUDO_USER tee "Desktop/$entryName" > /dev/null
+	chmod +x "Desktop/$entryName"
+	cp "Desktop/$entryName" /usr/share/applications/
+	chmod 644 /usr/share/applications/$entryName
+}
+
+function addPgpKey() {
+	local gpgFile=$1
+	local gpgServer=$2
+	local gpgKey=$3
+
+	if [[ -z "$gpgServer" ]]; then 			# old version
+		wget -nv $gpgFile -O - | apt-key add -
+	elif [[ -z "$gpgKey" ]]; then 			# new version
+		wget -nv $gpgServer -O - | gpg --no-default-keyring --keyring temp-keyring.gpg --import
+		gpg --no-default-keyring --keyring temp-keyring.gpg --export --output $KEY_RING_DIR/$gpgFile
+		rm temp-keyring.gpg
+
+		#wget -nv $gpgServer -O - | gpg --no-default-keyring --keyring $KEY_RING_DIR/$gpgFile --import
+		#gpg --no-default-keyring --keyring $KEY_RING_DIR/$gpgFile --export > /etc/apt/trusted.gpg.d/$gpgFile
+	else 												        # use a key server
+		gpg --no-default-keyring --keyring $KEY_RING_DIR/$gpgFile --keyserver $gpgServer --recv-keys $gpgKey
+#		gpg --ignore-time-conflict --no-options --no-default-keyring --secret-keyring /tmp/tmp.rh1myoBdSE --trustdb-name /etc/apt/trustdb.gpg --keyring /etc/apt/trusted.gpg --primary-keyring /etc/apt/trusted.gpg --keyserver keyserver.ubuntu.com --recv 7F0CEB10
+		gpg --export --keyring $KEY_RING_DIR/$gpgFile > /etc/apt/trusted.gpg.d/$gpgFile
+	fi
+}
+
+function getLatestRelease() {
+	curl --silent "$1/latest" | sed -E 's|.*/tag/([^"]+).*|\1|'
+}

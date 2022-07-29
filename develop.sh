@@ -66,8 +66,6 @@ HOME_USER="/home/$SUDO_USER"
 SOURCES_DIR='/etc/apt/sources.list.d'
 KEY_RING_DIR='/usr/share/keyrings'
 
-cd $HOME_USER
-
 if [[ $(id -u) != 0 ]]; then
 	 echo
 	 echo 'Ups, I am not root!'
@@ -77,132 +75,9 @@ fi
 #####################################################################
 ## some functions
 #####################################################################
+source functions
 
-# insertPathFkts file
-function insertPathFkts() {
-	if ! grep -F -q 'path_add()' $1 ; then
-		cat <<- 'EOT' | sudo -u $SUDO_USER tee -a $1 > /dev/null
-
-			path_add() {
-			  NEW_ELEMENT=${1%/}
-			  if [ -d "$1" ] && ! echo $PATH | grep -E -q "(^|:)$NEW_ELEMENT(:|$)" ; then
-			    if [ "$2" = "after" ] ; then
-			      PATH="$PATH:$NEW_ELEMENT"
-			    else
-			      PATH="$NEW_ELEMENT:$PATH"
-			    fi
-			  fi
-			}
-
-			path_rm() {
-			  PATH="$(echo $PATH | sed -e 's;\(^\|:\)${1%/}\(:\|\$\);\1\2;g' -e 's;^:\|:$;;g' -e 's;::;:;g')"
-			}
-		EOT
-		# dont forget 'export PATH'
-	fi
-}
-
-# addBinToPath file path <after>
-function addBinToPath() {
-	insertPathFkts $1
-	local addPathStr="path_add '$2'"
-
-	if ! grep -F -q "$addPathStr" $1 ; then
-		echo "add '$2' to '$1'"
-		cat <<- EOT | sudo -u $SUDO_USER tee -a $1 > /dev/null
-
-			$addPathStr $3
-			export PATH
-		EOT
-	else
-		echo "'$1' already contain '$addPathStr'!"
-	fi
-}
-
-# addExportEnv file env value
-function addExportEnv() {
-	insertPathFkts $1
-	local exportStr="export $2=\"$3\""
-
-	if ! grep -F -q "$exportStr" $1 ; then
-		echo "add '$exportStr' to '$1'"
-		cat <<- EOT | sudo -u $SUDO_USER tee -a $1 > /dev/null
-
-			$exportStr
-		EOT
-	else
-		echo "'$1' already contain '$exportStr'!"
-	fi
-}
-
-function listFile() {
-	ls -t $HOME_USER/$1 2>/dev/null | head -1
-}
-
-# downloadDriver download-url default-url search-mask dst-dir dst-name
-function downloadDriver() {
-	if [[ -z "$4" ]]; then
-		local dst='Downloads'
-	else
-		local dst="Downloads/$4"
-	fi
-	if [[ ! -z "$5" ]]; then
-		rm -f $HOME_USER/$dst/$5
-	fi
-	local searchObj=$(listFile $dst/$3)
-	if [[ ! -z "$2" ]] && [[ ! -f "$searchObj" ]]; then
-		if [[ -z "$5" ]]; then
-			sudo -u $SUDO_USER wget -P $dst $2
-		else
-			sudo -u $SUDO_USER wget -c $dst/$5 $2
-		fi
-		searchObj=$(listFile $dst/$3)
-	fi
-	if [[ ! -z "$1" ]] && [[ ! -f "$searchObj" ]]; then
-		sudo -u $SUDO_USER bash -c "DISPLAY=:0.0 x-www-browser $1"
-		read -p "Press [Enter] key to continue if you finished the download of the latest driver to '~/$dst/'"
-		searchObj=$(listFile $dst/$3)
-	fi
-	if [[ ! -f "$searchObj" ]]; then
-		echo 'missing driver!'
-		exit 1
-	fi
-	echo $searchObj
-}
-
-function createDesktopEntry() {
-	local entryName=$1
-	shift
-
-	cat $@ | sudo -u $SUDO_USER tee "Desktop/$entryName" > /dev/null
-	chmod +x "Desktop/$entryName"
-	cp "Desktop/$entryName" /usr/share/applications/
-	chmod 644 /usr/share/applications/$entryName
-}
-
-function addPgpKey() {
-	local gpgFile=$1
-	local gpgServer=$2
-	local gpgKey=$3
-
-	if [[ -z "$gpgServer" ]]; then 			# old version
-		wget -nv $gpgFile -O - | apt-key add -
-	elif [[ -z "$gpgKey" ]]; then 			# new version
-		wget -nv $gpgServer -O - | gpg --no-default-keyring --keyring temp-keyring.gpg --import
-		gpg --no-default-keyring --keyring temp-keyring.gpg --export --output $KEY_RING_DIR/$gpgFile
-		rm temp-keyring.gpg
-		#wget -nv $gpgServer -O - | gpg --no-default-keyring --keyring $KEY_RING_DIR/$gpgFile --import
-		#gpg --no-default-keyring --keyring $KEY_RING_DIRp/$gpgFile --export > /etc/apt/trusted.gpg.d/$gpgFile
-	else 												# use a key server
-		gpg --no-default-keyring --keyring $KEY_RING_DIR/$gpgFile --keyserver $gpgServer --recv-keys $gpgKey
-#		gpg --ignore-time-conflict --no-options --no-default-keyring --secret-keyring /tmp/tmp.rh1myoBdSE --trustdb-name /etc/apt/trustdb.gpg --keyring /etc/apt/trusted.gpg --primary-keyring /etc/apt/trusted.gpg --keyserver keyserver.ubuntu.com --recv 7F0CEB10
-		gpg --export --keyring $KEY_RING_DIR/$gpgFile > /etc/apt/trusted.gpg.d/$gpgFile
-	fi
-}
-
-function getLatestRelease() {
-	curl --silent "$1/latest" | sed -E 's|.*/tag/([^"]+).*|\1|'
-}
+cd $HOME_USER
 
 function updateAlternatives() {
 	local dir=$1
@@ -255,7 +130,7 @@ if [[ ! -z "$DO_SCALA" ]]; then
 	SCALA_SRC='scala-*.tgz'
 
 #	echo $SCALA_GET/$SCALA_REL/$SCALA_DEF
-	SCALA_DRV=$(downloadDriver $SCALA_URL $SCALA_GET/$SCALA_REL/$SCALA_DEF $SCALA_SRC scala)
+	SCALA_DRV=$(downloadDriver $SCALA_URL $SCALA_GET/$SCALA_REL/$SCALA_DEF scala $SCALA_SRC)
 
 	SCALA_DIR='/usr/lib/scala'
 	SCALA_FLR=$(basename $SCALA_DRV .tgz)
@@ -286,8 +161,8 @@ if [[ ! -z "$DO_DOTTY" ]]; then
 
 	DOTTY_DEF="scala3-$DOTTY_REL.zip"
 	DOTTY_SRC='scala3-*.zip'
-#	echo "downloadDriver $DOTTY_URL $DOTTY_URL/download/$DOTTY_REL/$DOTTY_DEF $DOTTY_DEF scala"
-	DOTTY_DRV=$(downloadDriver $DOTTY_URL $DOTTY_URL/download/$DOTTY_REL/$DOTTY_DEF $DOTTY_DEF scala)
+#	echo "downloadDriver $DOTTY_URL $DOTTY_URL/download/$DOTTY_REL/$DOTTY_DEF scala $DOTTY_DEF"
+	DOTTY_DRV=$(downloadDriver $DOTTY_URL $DOTTY_URL/download/$DOTTY_REL/$DOTTY_DEF scala $DOTTY_DEF)
 
 	DOTTY_DIR='/usr/lib/scala'
 	DOTTY_FLR=$(basename $DOTTY_DRV .zip)

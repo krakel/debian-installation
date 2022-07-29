@@ -31,6 +31,7 @@ Commands:
   etcher    bootable USB drives or SD cards
   unet      bootable USB drives or SD cards
   autofs    auto mount usb device
+  hp        HP printer driver
 
   kvm       KVM, QEMU with Virt-Manager (1 reboot)
   iso       install a iso
@@ -38,24 +39,6 @@ Commands:
   anbox     Anbox, a Android Emulator (very alpha)
   rdp       remote desktop
   express   ExpressVPN
-
-  wine      Wine
-  steam     Steam
-  lutris    Lutris
-  dxvk      vulkan-based compatibility layer for Direct3D
-  dnet      Microsoft .Net 4.6.1 (do not use)
-  multimc   Minecraft MultiMC
-
-  chatty    Chatty
-  discord   Discord
-  dream     Dreambox Edit
-  mozilla   Firefox + Thunderbird
-  firefox   Firefox move profile
-  thunder   Thunderbird move profile
-  spotify   Spotify, some music
-  chrome    Google Chrome
-  twitch    twitch gui
-  video     VideoLan
 
   gpic      GPicview image viewer
   viewnior  Viewnior image viewer
@@ -72,28 +55,18 @@ declare -A SELECT=(
 	[amd]=DO_AMD
 	[anbox]=DO_ANBOX
 	[autofs]=DO_AUTOFS
-	[chatty]=DO_CHATTY
-	[chrome]=DO_CHROME
 	[cifs]=DO_CIFS
 	[cifsk]=DO_CIFS_KVM
 	[conky]=DO_CONKY
-	[discord]=DO_DISCORD
-	[dnet]=DO_DOT_NET
-	[dream]=DO_DREAMBOX_EDIT
-	[dxvk]=DO_DXVK
 	[etcher]=DO_ETCHER
 	[express]=DO_EXPRESS
-	[firefox]=DO_FIREFOX
-	[thunder]=DO_THUNDER
 	[gpic]=DO_GPIC
+	[hp]=DO_HP
 	[iso]=DO_ISO
 	[kvm]=DO_KVM
 	[login]=DO_AUTO_LOGIN
-	[lutris]=DO_LUTRIS
 	[mirage]=DO_MIRAGE
 	[moka]=DO_MOKA
-	[mozilla]=DO_MOZILLA
-	[multimc]=DO_MULTI_MC
 	[nvidia2]=DO_NVIDIA_OFFICAL
 	[nvidia3]=DO_NVIDIA_REINSTALL
 	[nvidia]=DO_NVIDIA
@@ -103,20 +76,15 @@ declare -A SELECT=(
 	[samba]=DO_SAMBA
 	[screen]=DO_SCREENSAVER
 	[snap]=DO_SNAPSHOT
-	[spotify]=DO_SPOTIFY
 	[src]=DO_SOURCE
-	[steam]=DO_STEAM
 	[su]=ONLY_SUDOER
 	[test]=DO_TEST
 	[tools]=DO_TOOLS
-	[twitch]=DO_TWITCH_GUI
 	[unet]=DO_UNETBOOTIN
 	[unstable]=DO_UNSTABLE
-	[video]=DO_VIDEOLAN
 	[viewnior]=DO_VIEWNIOR
 	[virtual]=DO_VIRTUAL_BOX
 	[visudo]=DO_VISUDO
-	[wine]=DO_WINE
 )
 
 if [[ $# -eq 0  ]]; then
@@ -155,8 +123,6 @@ THIS_DOMAIN='at-home'
 WIN_USER=$SUDO_USER              # change this to your windows user name
 WIN_DOMAIN="work.$THIS_DOMAIN"	# change this to your windows domain
 
-cd $HOME_USER
-
 function logoutNow() {
 	echo
 	echo -n 'You need to logout now!'
@@ -181,6 +147,10 @@ fi
 #####################################################################
 ## some functions
 #####################################################################
+source functions
+
+cd $HOME_USER
+
 function continueNow() {
 	echo
 	echo -n "$1 (Y/n)"
@@ -204,144 +174,6 @@ function rebootNow() {
 	systemctl reboot
 }
 
-# insertPathFkts file
-function insertPathFkts() {
-	if ! grep -F -q 'path_add()' $1 ; then
-		cat <<- 'EOT' | sudo -u $SUDO_USER tee -a $1 > /dev/null
-
-			path_add() {
-			  NEW_ELEMENT=${1%/}
-			  if [ -d "$1" ] && ! echo $PATH | grep -E -q "(^|:)$NEW_ELEMENT(:|$)" ; then
-			    if [ "$2" = "after" ] ; then
-			      PATH="$PATH:$NEW_ELEMENT"
-			    else
-			      PATH="$NEW_ELEMENT:$PATH"
-			    fi
-			  fi
-			}
-
-			path_rm() {
-			  PATH="$(echo $PATH | sed -e 's;\(^\|:\)${1%/}\(:\|\$\);\1\2;g' -e 's;^:\|:$;;g' -e 's;::;:;g')"
-			}
-		EOT
-		# dont forget 'export PATH'
-	fi
-}
-
-# addBinToPath file path <after>
-function addBinToPath() {
-	insertPathFkts $1
-	local addPathStr="path_add '$2'"
-
-	if ! grep -F -q "$addPathStr" $1 ; then
-		echo "add '$2' to '$1'"
-		cat <<- EOT | sudo -u $SUDO_USER tee -a $1 > /dev/null
-
-			$addPathStr $3
-			export PATH
-		EOT
-	else
-		echo "'$1' already contain '$addPathStr'!"
-	fi
-}
-
-# addExportEnv file env value
-function addExportEnv() {
-	insertPathFkts $1
-	local exportStr="export $2=\"$3\""
-
-	if ! grep -F -q "$exportStr" $1 ; then
-		echo "add '$exportStr' to '$1'"
-		cat <<- EOT | sudo -u $SUDO_USER tee -a $1 > /dev/null
-
-			$exportStr
-		EOT
-	else
-		echo "'$1' already contain '$exportStr'!"
-	fi
-}
-
-# addCommand file cmd
-function addCommand() {
-	local commandStr="$2"
-
-	if ! grep -F -q "$commandStr" $1 ; then
-		echo "add '$commandStr' to '$1'"
-		cat <<- EOT | sudo -u $SUDO_USER tee -a $1 > /dev/null
-
-			$commandStr
-		EOT
-	else
-		echo "'$1' already contain '$commandStr'!"
-	fi
-}
-
-function addSudoComplete() {
-	if ! grep -F -q 'complete -cf sudo' $1 ; then
-		cat <<- 'EOT' | sudo -u $SUDO_USER tee -a $1 > /dev/null
-
-			if [ "$PS1" ]; then
-			  complete -cf sudo
-			fi
-		EOT
-	fi
-
-}
-
-# installLib lib-name
-function installLib() {
-	ldconfig -p | grep -F "$1"
-	if [[ "$?" != "0" ]]; then
-		apt install $1
-		apt autoremove
-	fi
-}
-
-function listFile() {
-	ls -t $HOME_USER/Downloads/$1 2>/dev/null | head -1
-}
-
-# downloadDriver download-url default-url search-mask dst-name
-function downloadDriver() {
-	local drvServer=$1
-	local drvUrl=$2
-	local drvMask=$3
-	local drvName=$4
-
-	if [[ ! -z "$drvName" ]]; then
-		rm -f $HOME_USER/Downloads/$drvName
-	fi
-	local searchObj=$(listFile $drvMask)
-	if [[ ! -z "$drvUrl" ]] && [[ ! -f "$searchObj" ]]; then
-		if [[ -z "$drvName" ]]; then
-			sudo -u $SUDO_USER wget -P Downloads $drvUrl -O
-		else
-			sudo -u $SUDO_USER wget -P Downloads $drvUrl -O -c $drvName
-		fi
-		searchObj=$(listFile $drvMask)
-	fi
-	if [[ ! -z "$drvServer" ]] && [[ ! -f "$searchObj" ]]; then
-		sudo -u $SUDO_USER bash -c "DISPLAY=:0.0 x-www-browser $drvServer"
-		read -p "Press [Enter] key to continue if you finished the download of the latest driver to '~/Downloads/'"
-		searchObj=$(listFile $drvMask)
-	fi
-	if [[ ! -f "$searchObj" ]]; then
-		echo 'missing driver!'
-		exit 1
-	fi
-	echo $searchObj
-}
-
-function createDesktopEntry() {
-	local entryName=$1
-	shift
-
-	cat $@ | sudo -u $SUDO_USER tee "Desktop/$entryName" > /dev/null
-	chmod +x "Desktop/$entryName"
-	cp "Desktop/$entryName" /usr/share/applications/
-	chmod 644 /usr/share/applications/$entryName
-}
-
 function createSudoCmd() {
 	local sudoerFile="/etc/sudoers.d/$1"
 	shift
@@ -349,31 +181,6 @@ function createSudoCmd() {
 	cat $@ > $sudoerFile
 	chmod 0440 $sudoerFile
 	visudo -c
-}
-
-function addPgpKey() {
-	local gpgFile=$1
-	local gpgServer=$2
-	local gpgKey=$3
-
-	if [[ -z "$gpgServer" ]]; then 			# old version
-		wget -nv $gpgFile -O - | apt-key add -
-	elif [[ -z "$gpgKey" ]]; then 			# new version
-		wget -nv $gpgServer -O - | gpg --no-default-keyring --keyring temp-keyring.gpg --import
-		gpg --no-default-keyring --keyring temp-keyring.gpg --export --output $KEY_RING_DIR/$gpgFile
-		rm temp-keyring.gpg
-
-		#wget -nv $gpgServer -O - | gpg --no-default-keyring --keyring $KEY_RING_DIR/$gpgFile --import
-		#gpg --no-default-keyring --keyring $KEY_RING_DIR/$gpgFile --export > /etc/apt/trusted.gpg.d/$gpgFile
-	else 												        # use a key server
-		gpg --no-default-keyring --keyring $KEY_RING_DIR/$gpgFile --keyserver $gpgServer --recv-keys $gpgKey
-#		gpg --ignore-time-conflict --no-options --no-default-keyring --secret-keyring /tmp/tmp.rh1myoBdSE --trustdb-name /etc/apt/trustdb.gpg --keyring /etc/apt/trusted.gpg --primary-keyring /etc/apt/trusted.gpg --keyserver keyserver.ubuntu.com --recv 7F0CEB10
-		gpg --export --keyring $KEY_RING_DIR/$gpgFile > /etc/apt/trusted.gpg.d/$gpgFile
-	fi
-}
-
-function getLatestRelease() {
-	curl --silent "$1/latest" | sed -E 's|.*/tag/([^"]+).*|\1|'
 }
 
 #####################################################################
@@ -496,6 +303,7 @@ if [[ ! -z "$DO_TOOLS" ]]; then
 	apt install fonts-noto    # nice font
 	apt install fonts-clear-sans
 	apt install imagemagick
+	apt install ffmpeg
 	apt install youtube-dl
 	apt autoremove
 
@@ -1145,406 +953,6 @@ if [[ ! -z "$DO_RDP" ]]; then
 fi
 
 #####################################################################
-# Gaming
-#####################################################################
-
-#####################################################################
-#####################################################################
-######### Wine
-######### WineHQ
-if [[ ! -z "$DO_WINE" ]]; then
-	echo '######### install Wine'
-	apt install gnupg2 software-properties-common
-
-	# not at latest debian testing
-	# repositories and images created with the Open Build Service
-	# OBS_URL='https://download.opensuse.org/repositories/Emulators:/Wine:/Debian/Debian_Testing_standard'
-	# addPgpKey 'wine.gpg' "https://$OBS_URL/Release.key"
-	# echo 'deb [signed-by=$KEY_RING_DIR/wine.gpg] http://$OBS_URL ./' > $SOURCES_DIR/wine-obs.list
-	# apt update
-
-	# LIB_SDL=libsdl2-2.0-0_2.0.10+dfsg1-1_amd64.deb
-	# sudo -u $SUDO_USER wget -P Downloads http://ftp.us.debian.org/debian/pool/main/libs/libsdl2/$LIB_SDL
-	# dpkg -i Downloads/$LIB_SDL
-	# apt install libsdl2-2.0-0
-
-	# LIB_FAUDIO=libfaudio0_20.01-0~bullseye_amd64.deb
-	# sudo -u $SUDO_USER wget -P Downloads https://$OBS_URL/amd64/$LIB_FAUDIO
-	# dpkg -i Downloads/$LIB_FAUDIO
-	# apt install libfaudio0
-
-	# winehq-stable:    Stable builds provide the latest stable version
-	# winehq-staging:   Staging builds contain many experimental patches intended to test some features or fix compatibility issues.
-	# winehq-devel:     Developer builds are in-development, cutting edge versions.
-
-	WINE_BUILDS='https://dl.winehq.org/wine-builds'
-	addPgpKey 'wineHQ.gpg' "$WINE_BUILDS/winehq.key"
-	echo "deb [signed-by=$KEY_RING_DIR/wineHQ.gpg] $WINE_BUILDS/debian/ bookworm main" > $SOURCES_DIR/wine.list
-	# echo "deb $WINE_BUILDS/debian/ testing  main" > $SOURCES_DIR/wine.list # <-- broken, not working
-	apt update
-
-	function wineInstallWine() {
-		WINEOPT=''
-		if [[ ! -z "$1" ]]; then
-			WINEOPT="-$1"
-		fi
-		if [[ ! -z "$2" ]]; then
-			WINEOPT="$WINEOPT=$2"
-		fi
-		apt install --install-recommends wine$WINEOPT wine32$WINEOPT wine64$WINEOPT libwine$WINEOPT libwine:i386$WINEOPT fonts-wine$WINEOPT
-	}
-
-	function wineInstallWineHQ() {
-		WINEOPT=''
-		if [[ ! -z "$1" ]]; then
-			WINEOPT="-$1"
-		fi
-		if [[ ! -z "$2" ]]; then
-			WINEOPT="$WINEOPT=$2"
-		fi
-		apt install --install-recommends winehq$WINEOPT
-	}
-
-	# apt-cache policy winehq-staging
-	WINE_VER=$(apt search wine-staging | grep -F 'wine-staging/' | cut -d ' ' -f 2)
-	if [[ -z "WINE_VER" ]]; then
-		echo 'missing wine-staging version'
-		apt search wine-staging
-		exit 1
-	fi
-	wineInstallWine   'staging' $WINE_VER
-	wineInstallWineHQ 'staging' $WINE_VER
-
-	sudo -u $SUDO_USER winecfg    # mono,gecko will be installed
-	if [[ "$?" != "0" ]]; then
-		echo 'something goes wrong!'
-		exit 1
-	fi
-
-	addBinToPath '.profile' '/opt/wine-staging/bin' after
-
-	apt install mono-complete
-	apt install winetricks
-	apt autoremove
-	wine --version
-fi
-
-#####################################################################
-#####################################################################
-######### Steam
-if [[ ! -z "$DO_STEAM" ]]; then
-	echo '######### install Steam'
-	STEAM_BUILDS='https://repo.steampowered.com/steam'
-#	addPgpKey 'steam.gpg' "$STEAM_BUILDS/archive/stable/steam.gpg"
-	addPgpKey 'steam.gpg' "$STEAM_BUILDS/archive/precise/steam.gpg"
-	cat <<- EOT > $SOURCES_DIR/steam.list
-		deb     [signed-by=$KEY_RING_DIR/steam.gpg] $STEAM_BUILDS stable steam
-		deb-src [signed-by=$KEY_RING_DIR/steam.gpg] $STEAM_BUILDS stable steam
-	EOT
-
-	apt update
-#  apt install libgl1-mesa-dri libgl1-mesa-dri:i386
-#  apt install libgl1-mesa-glx libgl1-mesa-glx:i386
-	apt install steam
-	# apt install  steam-launcher
-
-	usermod -aG video,audio $SUDO_USER
-	apt autoremove
-	echo
-	echo "run steam and enable 'Steam Play' and 'Proton'"
-fi
-
-#####################################################################
-#####################################################################
-######### Lutris
-if [[ ! -z "$DO_LUTRIS" ]]; then
-	echo '######### install Lutris'
-	LUTRIS_URL='https://download.opensuse.org/repositories/home:/strycore/Debian_Testing'
-	addPgpKey 'lutris.gpg' "$LUTRIS_URL/Release.key"
-	echo "deb [signed-by=$KEY_RING_DIR/lutris.gpg] $LUTRIS_URL/ ./" > $SOURCES_DIR/lutris.list
-	apt update
-	apt install lutris
-	apt install gamemode
-
-	find /usr -iname 'libgamemode*'
-	LUTRIS_PRE=$(find /usr -iname 'libgamemode*' | grep auto | head -1)
-	echo
-	echo "add to Lutris preferences and try other if not working (I don't know if needed)"
-	echo "LD_PRELOAD    = $LUTRIS_PRE"
-	echo "mesa_glthread = true"
-
-#	wget https://cdn.discordapp.com/attachments/538903130704838656/796102070825779250/dxvk_versions.json -P $HOME/.local/share/lutris/runtime/dxvk
-fi
-
-#####################################################################
-#####################################################################
-######### dxvk is a Vulkan-based compatibility layer for Direct3D 11
-if [[ ! -z "$DO_DXVK" ]]; then
-	echo '######### install DXVK'
-	apt install dxvk/sid
-fi
-
-#####################################################################
-#####################################################################
-######### Microsoft .Net 4.6.1
-if [[ ! -z "$DO_DOT_NET" ]]; then
-	echo '######### install .Net'
-	apt install winetricks
-	env WINEPREFIX=winedotnet wineboot --init
-	env WINEPREFIX=winedotnet winetricks dotnet461 corefonts
-fi
-
-#####################################################################
-#####################################################################
-######### MultiMC
-# https://multimc.org
-if [[ ! -z "$DO_MULTI_MC" ]]; then
-	echo '######### install Minecraft MultiMC'
-
-	#apt install qt5-default
-	apt install libqt5xml5
-
-	MULTIMC_URL='https://multimc.org'
-	MULTIMC_REL='1.5-1'
-	MULTIMC_DEF="multimc_$MULTIMC_REL.deb"
-	MULTIMC_SRC='multimc_*.deb'
-	MULTIMC_DRV=$(downloadDriver $MULTIMC_URL $MULTIMC_URL/download/$MULTIMC_DEF $MULTIMC_SRC)
-
-	dpkg --force-depends -i $MULTIMC_DRV
-	#apt install multimc
-fi
-
-#####################################################################
-# Media
-#####################################################################
-
-#####################################################################
-#####################################################################
-######### Discord
-# https://linuxconfig.org/how-to-install-discord-on-linux
-if [[ ! -z "$DO_DISCORD" ]]; then
-	echo '######### install Discord'
-
-	DISCORD_URL='https://discordapp.com/api/download?platform=linux&format=deb'
-	DISCORD_SRC='discord*.deb'
-	DISCORD_LST='discord-latest.deb'
-	echo "download_driver '' $DISCORD_URL $DISCORD_SRC"
-	DISCORD_DRV=$(downloadDriver '' $DISCORD_URL $DISCORD_SRC $DISCORD_LST)
-
-	apt install libgconf-2-4
-
-	dpkg -i $DISCORD_DRV
-fi
-
-#####################################################################
-#####################################################################
-######### Dreambox Edit
-# https://blog.videgro.net/2013/10/running-dreamboxedit-at-linux/
-if [[ ! -z "$DO_DREAMBOX_EDIT" ]]; then
-	echo '######### install Dreambox Edit'
-
-	DREAMBOX_URL='https://dreambox.de/board/index.php?board/47-sonstige-pc-software/'
-	DREAMBOX_REL='7.2.1.0'
-	DREAMBOX_DEF="dreamboxEDIT_without_setup_$DREAMBOX_REL.zip"
-	DREAMBOX_SRC='dreamboxEDIT_without_setup_*.zip'
-	DREAMBOX_DRV=$(downloadDriver $DREAMBOX_URL '' $DREAMBOX_SRC)
-
-	echo $DREAMBOX_DRV
-	DREAMBOX_DIR=/opt/dreamboxedit
-	mkdir -p $DREAMBOX_DIR
-	unzip $DREAMBOX_DRV -d $DREAMBOX_DIR
-#  ln -s /opt/dreamboxedit_5_3_0_0/ $DREAMBOX_DIR
-
-	groupadd dreamboxedit
-	usermod -aG dreamboxedit $SUDO_USER
-	chown -R root:dreamboxedit $DREAMBOX_DIR
-
-	echo
-	echo 'cd /opt/dreamboxedit'
-	echo 'wine dreamboxEDIT.exe'
-fi
-
-#####################################################################
-#####################################################################
-######### Firefox + Thunderbird
-
-if [[ ! -z "$DO_MOZILLA" ]]; then
-	echo '######### install Firefox + Thunderbird'
-
-	apt remove --purge iceweasel
-
-	apt install -t unstable firefox
-	apt install -t unstable thunderbird
-fi
-
-
-function mozillaCopyProfile() {
-	local profileZIP=$1
-	local profileLIN=$2
-	local profileWIN=$3
-	local profileOLD="$profileLIN/win10profile"
-	local profileINI="$profileLIN/profiles.ini"
-
-	if [[ -d "$profileOLD" ]]; then
-		echo 'windows profile already exist'
-		return
-	fi
-
-	sudo -u $SUDO_USER mkdir -p $profileOLD
-
-	if [[ -d "$profileWIN" ]]; then
-		local winProf=$(grep "StartWithLastProfile" $profileWIN/profiles.ini | cut -d '=' -f 2 | tr -d '\r')
-		local pathProf=$(grep -m${winProf:-1} -F '[Profile' $profileWIN/profiles.ini -A 3 | grep "Path" | cut -d '=' -f 2 | tr -d '\r')
-		if [[ -z "$pathProf" ]]; then
-			echo 'missing profile path entry'
-			return
-		fi
-		echo "cp -f -r $profileWIN/$pathProf/* $profileOLD"
-		sudo -u $SUDO_USER cp -f -r $profileWIN/$pathProf/* $profileOLD
-	elif [[ -f "$profileZIP" ]]; then
-		sudo -u $SUDO_USER unzip $profileZIP -d $pprofileOLD
-	else
-		echo 'missing copy of Windows profile'
-		return
-	fi
-
-	if [[ ! -f "$profileINI" ]]; then
-		cat <<- EOT | sudo -u $SUDO_USER tee $profileINI > /dev/null
-			[General]
-			StartWithLastProfile=0
-			Version=2
-		EOT
-	fi
-	sudo -u $SUDO_USER sed -i '0,/StartWithLastProfile=[0-9]*/s//StartWithLastProfile=0/' $profileINI
-	if ! grep -F -q 'win10profile' $profileINI ; then
-		cat <<- EOT | sudo -u $SUDO_USER tee -a $profileINI > /dev/null
-			[Profile0]
-			Name=win10profile
-			IsRelative=1
-			Path=win10profile
-
-			[General]
-			StartWithLastProfile=1
-		EOT
-	fi
-}
-
-#####################################################################
-#####################################################################
-######### Firefox Profile
-if [[ ! -z "$DO_FIREFOX" ]]; then
-
-	FIREFOX_WINDOWS="/mnt/work_c/Users/$WIN_USER/AppData/Roaming/Mozilla/Firefox"
-	FIREFOX_LINUX="$HOME_USER/.mozilla/firefox"
-
-	mozillaCopyProfile 'Download/firefox.zip'     $FIREFOX_LINUX     $FIREFOX_WINDOWS
-fi
-
-#####################################################################
-#####################################################################
-######### Thunderbird Profile
-if [[ ! -z "$DO_THUNDER" ]]; then
-
-	THUNDERBIRD_WINDOWS="/mnt/work_c/Users/$WIN_USER/AppData/Roaming/Thunderbird"
-	THUNDERBIRD_LINUX="$HOME_USER/.thunderbird"
-
-	mozillaCopyProfile 'Download/thunderbird.zip' $THUNDERBIRD_LINUX $THUNDERBIRD_WINDOWS
-fi
-
-#####################################################################
-#####################################################################
-######### Spotify
-# https://wiki.debian.org/spotify
-# https://www.spotify.com/de/download/linux/
-if [[ ! -z "$DO_SPOTIFY" ]]; then
-	echo '######### install Spotify'
-
-	addPgpKey 'spotify.gpg' 'hkps://keyserver.ubuntu.com:443' '5E3C45D7B312C643'
-	echo "deb [signed-by=$KEY_RING_DIR/spotify.gpg] http://repository.spotify.com stable non-free" > $SOURCES_DIR/spotify.list
-	apt update
-
-	apt install spotify-client
-fi
-
-#####################################################################
-#####################################################################
-######### Spotify
-if [[ ! -z "$DO_CHROME" ]]; then
-	echo '######### install Google Chrome'
-	apt install software-properties-common apt-transport-https wget ca-certificates gnupg2
-
-	addPgpKey 'chrome.gpg' 'https://dl.google.com/linux/linux_signing_key.pub'
-	echo "deb [arch=amd64 signed-by=$KEY_RING_DIR/chrome.gpg] http://dl.google.com/linux/chrome/deb/ stable main" > $SOURCES_DIR/chrome.list
-	apt update
-
-	apt install google-chrome-stable
-fi
-
-#####################################################################
-#####################################################################
-######### twitch gui
-# https://github.com/streamlink/streamlink-twitch-gui
-# https://www.hiroom2.com/2018/05/27/ubuntu-1804-twitch-en/
-# --twitch-disable-ads --twitch-low-latency --hls-live-edge=2 --hls-segment-stream-data --hls-segment-threads=4 --stream-segment-threads=4 --retry-streams 10 --retry-max 100 --retry-open 10 --default-stream "best,720p,480p,worst"
-if [[ ! -z "$DO_TWITCH_GUI" ]]; then
-	echo '######### install Streamlink'
-	apt install streamlink
-
-	echo '######### install twitch gui'
-	TWITCH_URL='https://github.com/streamlink/streamlink-twitch-gui/releases'
-	TWITCH_REL='v1.11.0'
-	TWITCH_DEF="streamlink-twitch-gui-${TWITCH_REL}-linux64.tar.gz"
-	TWITCH_SRC='streamlink-twitch-gui-*-linux64.tar.gz'
-	TWITCH_DRV=$(downloadDriver $TWITCH_URL $TWITCH_URL/download/$TWITCH_REL/$TWITCH_DEF $TWITCH_SRC)
-
-	tar -xzvf $TWITCH_DRV -C /opt
-	apt install xdg-utils libgconf-2-4
-	/opt/streamlink-twitch-gui/add-menuitem.sh
-	ln -s /opt/streamlink-twitch-gui/start.sh /usr/bin/streamlink-twitch-gui
-
-	createDesktopEntry "streamlink.desktop" <<- EOT
-		[Desktop Entry]
-		Version=1.0
-		Name=Streamlink Twitch GUI
-		Comment=Browse Twitch.tv and watch streams in your videoplayer of choice
-		Exec=/opt/streamlink-twitch-gui/streamlink-twitch-gui --twitch-disable-ads --twitch-low-latency --hls-live-edge=2 --hls-segment-stream-data --hls-segment-threads=4 --stream-segment-threads=4 --retry-streams 10 --retry-max 100 --retry-open 10 --default-stream "best,720p,480p,worst"
-		Icon=streamlink-twitch-gui.png
-		Terminal=false
-		Type=Application
-		Categories=Utility;Internet;Video;
-		StartupNotify=true
-	EOT
-fi
-
-#####################################################################
-#####################################################################
-######### VideoLan
-# https://www.videolan.org
-if [[ ! -z "$DO_VIDEOLAN" ]]; then
-	echo '######### install VideoLan'
-	apt install vlc
-
-fi
-
-#####################################################################
-#####################################################################
-######### Chatty
-if [[ ! -z "$DO_CHATTY" ]]; then
-	echo '######### install Chatty'
-	apt install default-jre
-
-	CHATTY_URL='https://github.com/chatty/chatty/releases'
-	CHATTY_REL=$(getLatestRelease $CHATTY_URL)
-	CHATTY_REL=${CHATTY_REL:1}
-	CHATTY_DEF="Chatty_$CHATTY_REL.zip"
-	CHATTY_SRC='Chatty_*.zip'
-	CHATTY_DRV=$(downloadDriver $CHATTY_URL $CHATTY_URL/download/v$CHATTY_REL/$CHATTY_DEF $CHATTY_SRC)
-
-	rm -rf /opt/chatty/*
-	unzip $CHATTY_DRV -d /opt/chatty
-fi
-
-#####################################################################
 # Diverse
 #####################################################################
 
@@ -1991,6 +1399,17 @@ if [[ ! -z "$DO_SNAPSHOT" ]]; then
 	systemctl reload autofs
 	echo
 	echo "edit your '/etc/rsnapshot.conf'"
+fi
+
+#####################################################################
+#####################################################################
+######### HP printer driver
+if [[ ! -z "$DO_HP" ]]; then
+	echo '######### install HP printer driver'
+	apt install hplip
+	apt install hplip-gui
+
+	hp-setup
 fi
 
 #####################################################################
