@@ -40,11 +40,8 @@ Commands:
   rdp       remote desktop
   express   ExpressVPN
 
-  gpic      GPicview image viewer
-  viewnior  Viewnior image viewer
-  mirage    Mirage image viewer (best)
-
   login     Autologin
+  sea       Seafile
   moka      nice icon set
   pwsafe    Password Safe
   screen    XScreensaver'
@@ -60,12 +57,10 @@ declare -A SELECT=(
 	[conky]=DO_CONKY
 	[etcher]=DO_ETCHER
 	[express]=DO_EXPRESS
-	[gpic]=DO_GPIC
 	[hp]=DO_HP
 	[iso]=DO_ISO
 	[kvm]=DO_KVM
 	[login]=DO_AUTO_LOGIN
-	[mirage]=DO_MIRAGE
 	[moka]=DO_MOKA
 	[nvidia2]=DO_NVIDIA_OFFICAL
 	[nvidia3]=DO_NVIDIA_REINSTALL
@@ -74,6 +69,7 @@ declare -A SELECT=(
 	[pwsafe]=DO_PASSWORD_SAFE
 	[rdp]=DO_RDP
 	[samba]=DO_SAMBA
+	[sea]=DO_SEAFILE
 	[screen]=DO_SCREENSAVER
 	[snap]=DO_SNAPSHOT
 	[src]=DO_SOURCE
@@ -82,7 +78,6 @@ declare -A SELECT=(
 	[tools]=DO_TOOLS
 	[unet]=DO_UNETBOOTIN
 	[unstable]=DO_UNSTABLE
-	[viewnior]=DO_VIEWNIOR
 	[virtual]=DO_VIRTUAL_BOX
 	[visudo]=DO_VISUDO
 )
@@ -118,9 +113,10 @@ THIS_IP=192.168.0.20
 THIS_DNS=192.168.0.1
 THIS_DEF=192.168.0.1
 THIS_DOMAIN='at-home'
+THIS_GIT_MAIL='uwe-git@doerl.de'
 
 # I use the same name
-WIN_USER=$SUDO_USER              # change this to your windows user name
+WIN_USER=$SUDO_USER             # change this to your windows user name
 WIN_DOMAIN="work.$THIS_DOMAIN"	# change this to your windows domain
 
 function logoutNow() {
@@ -238,7 +234,9 @@ if [[ ! -z "$DO_SOURCE" ]]; then
 
 	apt install net-tools
 	apt install apt-transport-https
+	apt install firmware-linux-free
 	apt install firmware-linux-nonfree
+	apt install firmware-misc-nonfree
 	apt install linux-headers-$(uname -r | sed 's/[^-]*-[^-]*-//')
 	apt install build-essential
 	# apt install dkms  # conflict kernel 5.7 with official nvidia driver
@@ -478,6 +476,18 @@ fi
 #####################################################################
 if [[ ! -z "$DO_SSH_AGENT" ]]; then
 
+	SSH_USER="$HOME_USER/.ssh"
+
+	if [[ ! -f "$SSH_USER/ssh-rsa.pub" ]]; then
+		sudo -u $SUDO_USER ssh-keygen -b 4096 -f $SSH_USER/ssh-rsa
+		echo 'copy .ssh/ssh-rsa.pub to your Raspberry Pi'
+	fi
+
+	if [[ ! -f "$SSH_USER/git-rsa.pub" ]]; then
+		sudo -u $SUDO_USER ssh-keygen -t git -C "$THIS_GIT_MAIL"
+		echo 'copy .ssh/git-rsa.pub to your git account'
+	fi
+
 	function addSSHAgent() {
 		if ! grep -F -q 'start_agent()' $1 ; then
 			cat <<- 'EOT' | sudo -u $SUDO_USER tee -a $1 > /dev/null
@@ -492,6 +502,7 @@ if [[ ! -z "$DO_SSH_AGENT" ]]; then
 				  . $SSH_ENV > /dev/null
 				  ssh-add $HOME/.ssh/id_rsa
 				  ssh-add $HOME/.ssh/git_rsa
+				  ssh-add $HOME/.ssh/ssh_rsa
 				}
 
 				function test_identities() {
@@ -1268,30 +1279,6 @@ fi
 
 #####################################################################
 #####################################################################
-######### GPicview image viewer
-if [[ ! -z "$DO_GPIC" ]]; then
-	echo '######### install GPicview'
-	apt install gpicview
-fi
-
-#####################################################################
-#####################################################################
-######### Viewnior image viewer
-if [[ ! -z "$DO_VIEWNIOR" ]]; then
-	echo '######### install Viewnior'
-	apt install viewnior
-fi
-
-#####################################################################
-#####################################################################
-######### Mirage image viewer
-if [[ ! -z "$DO_MIRAGE" ]]; then
-	echo '######### install Mirage'
-	apt install mirage
-fi
-
-#####################################################################
-#####################################################################
 ######### Express VPN
 if [[ ! -z "$DO_EXPRESS" ]]; then
 	echo '######### install ExpressVPN'
@@ -1317,6 +1304,20 @@ if [[ ! -z "$DO_ETCHER" ]]; then
 
 	apt update
 	apt install balena-etcher-electron
+fi
+
+#####################################################################
+#####################################################################
+######### Seafile 
+if [[ ! -z "$DO_SEAFILE" ]]; then
+	echo '######### install Seafile driver'
+	SEAFILE_URL='https://linux-clients.seafile.com'
+
+	addPgpKey 'seafile.gpg' "$SEAFILE_URL/seafile.asc"
+	echo "deb [arch=amd64 signed-by=$KEY_RING_DIR/seafile.gpg] $SEAFILE_URL/seafile-deb/bullseye/ stable main" > $SOURCES_DIR/seafile.list
+
+	apt update
+	apt install seafile-gui
 fi
 
 #####################################################################

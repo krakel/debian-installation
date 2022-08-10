@@ -18,6 +18,10 @@ Commands:
   video     VideoLan
   webex     Webex
 
+  gpic      GPicview image viewer
+  viewnior  Viewnior image viewer
+  mirage    Mirage image viewer (best)
+
   chrome    Google Chrome
   firefox   Firefox move profile
   mozilla   Firefox + Thunderbird
@@ -30,16 +34,19 @@ declare -A SELECT=(
 	[discord]=DO_DISCORD
 	[dream]=DO_DREAMBOX_EDIT
 	[firefox]=DO_FIREFOX
+	[gpic]=DO_GPIC
+	[mirage]=DO_MIRAGE
 	[mozilla]=DO_MOZILLA
 	[signal]=DO_SIGNAL
 	[spotify]=DO_SPOTIFY
 	[telegram]=DO_TELEGRAM
 	[test]=DO_TEST
+	[test]=DO_TEST
 	[thunder]=DO_THUNDER
 	[twitch]=DO_TWITCH_GUI
 	[video]=DO_VIDEOLAN
+	[viewnior]=DO_VIEWNIOR
 	[webex]=DO_WEBEX
-	[test]=DO_TEST
 )
 
 if [[ $# -eq 0  ]]; then
@@ -247,6 +254,30 @@ if [[ ! -z "$DO_WEBEX" ]]; then
 
 	#apt update
 	apt install $WEBEX_DRV
+fi
+
+#####################################################################
+#####################################################################
+######### GPicview image viewer
+if [[ ! -z "$DO_GPIC" ]]; then
+	echo '######### install GPicview'
+	apt install gpicview
+fi
+
+#####################################################################
+#####################################################################
+######### Viewnior image viewer
+if [[ ! -z "$DO_VIEWNIOR" ]]; then
+	echo '######### install Viewnior'
+	apt install viewnior
+fi
+
+#####################################################################
+#####################################################################
+######### Mirage image viewer
+if [[ ! -z "$DO_MIRAGE" ]]; then
+	echo '######### install Mirage'
+	apt install mirage
 fi
 
 #####################################################################

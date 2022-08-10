@@ -26,13 +26,14 @@ Commands:
   bind      bind9 dns service
   maria     database configuration
   next      next cloud
-'
+  git       git server'
 }
 
 declare -A SELECT=(
 	[apache]=DO_APACHE
 	[bind]=DO_BIND
 	[flash]=DO_FLASH
+	[git]=DO_GIT
 	[lets]=DO_LETS_ENCRYPT
 	[maria]=DO_MARIA
 	[next]=DO_NEXT_CLOUD
@@ -778,7 +779,6 @@ fi
 # https://ohmyz.sh
 if [[ ! -z "$DO_OHMYZ" ]]; then
 	echo '######### install OHMYZ shell extension'
-	apt install git
 	apt install zsh
 	apt install curl
 
@@ -787,6 +787,22 @@ if [[ ! -z "$DO_OHMYZ" ]]; then
 	sudo -u $SUDO_USER sort .bash_history | uniq | awk '{print ": :0:;"$0}' >> .zsh_history
 
 	logoutNow
+fi
+
+#####################################################################
+#####################################################################
+######### Git
+if [[ ! -z "$DO_GIT" ]]; then
+	echo '######### install git server'
+	apt install git
+
+	sudo -u $SUDO_USER mkdir -p $HOME_USER/git
+	cd $HOME_USER/git
+	sudo -u $SUDO_USER git init --bare test
+
+	# git remote add origin [email protected]:/home/git/repositories/test
+	# git push origin master
+	# git clone [email protected]Server-IP:/home/git/repositories/test
 fi
 
 #####################################################################
