@@ -1,0 +1,70 @@
+ln -s /mnt/data/wine32 .wine32
+WINEARCH=win32 WINEPREFIX=/home/uwe/.wine32 wine wineboot
+WINEARCH=win32 WINEPREFIX=/home/uwe/.wine32 winecfg
+WINEARCH=win32 WINEPREFIX=/home/uwe/.wine32 winetricks
+
+WINEARCH=win32 WINEPREFIX=/home/uwe/.wine32 winetricks -q d3dcompiler_47 dotnet48
+WINEARCH=win32 WINEPREFIX=/home/uwe/.wine32 start "C:\\Program Files\\Anno.Designer.v9.4\\AnnoDesigner.exe"
+
+ln -s /mnt/data/wineNinja .wineNinja
+WINEARCH=win32 WINEPREFIX=/home/uwe/.wineNinja wine wineboot
+WINEARCH=win32 WINEPREFIX=/home/uwe/.wineNinja wine --version
+WINEARCH=win32 WINEPREFIX=/home/uwe/.wineNinja winecfg
+WINEARCH=win32 WINEPREFIX=/home/uwe/.wineNinja winetricks
+
+WINEARCH=win32 WINEPREFIX=/home/uwe/.wine wine uninstaller 
+
+WINEARCH=win32 WINEPREFIX=/home/uwe/.wineNinja winetricks -q corefonts fontsmooth=rgb
+WINEARCH=win32 WINEPREFIX=/home/uwe/.wineNinja winetricks -q atmlib gdiplus mdac27 mdac28 msftedit msxml3 msxml4 msxml6 riched20 riched30
+WINEARCH=win32 WINEPREFIX=/home/uwe/.wineNinja winetricks -q vb6run vcrun2003 vcrun2005 vcrun2008 vcrun2010 vcrun2012 vcrun2013
+WINEARCH=win32 WINEPREFIX=/home/uwe/.wineNinja winetricks -q d3dcompiler_47 dotnet45
+
+WINEARCH=win32 WINEPREFIX=/home/uwe/.wineNinja wine msiexec /i Downloads/wine-gecko-2.47.3-x86.msi
+WINEARCH=win32 WINEPREFIX=/home/uwe/.wineNinja wine msiexec /i Downloads/NinjaTrader.8.0.26.1.msi
+WINEARCH=win32 WINEPREFIX=/home/uwe/.wineNinja wine start 'C:\\Program Files\NinjaTrader 8\bin\NinjaTrader.exe'
+
+WINEARCH=win32 WINEPREFIX=/home/uwe/.wineNinja wine msiexec /i Downloads/wine-gecko-2.47.3-x86.msi
+WINEARCH=win32 WINEPREFIX=/home/uwe/.wineNinja wine msiexec /i Downloads/NinjaTrader7.Install.msi
+WINEARCH=win32 WINEPREFIX=/home/uwe/.wineNinja wine start 'C:\\Program Files\NinjaTrader 7\bin\NinjaTrader.exe'
+
+wget http://dl.winehq.org/wine/wine-gecko/2.47.1/wine-gecko-2.47.3-x86.msi
+wine msiexec /i wine-gecko-2.47.3-x86.msi
+
+atmlib
+gdiplus		MSGDI+
+mdac27		Microsoft Data Access Components 2.7
+mdac28		Microsoft Data Access Components 2.8
+msftedit	Microsoft RichEdit Control
+msxml4		MS XML Core Service 4.0
+msxml6		MS XML Core Service 6.0
+riched20	MS RichEdit Control 2.0
+riched30	MS RichEdit Control 3.0
+vb6run		MS Visual Basic 6
+vcrun2003	Visual C++ 2003 libraries
+vcrun2005	Visual C++ 2005 libraries
+vcrun2008	Visual C++ 2008 libraries
+vcrun2010	Visual C++ 2010 libraries
+vcrun2012	Visual C++ 2012 libraries
+vcrun2013	Visual C++ 2013 libraries
+vcrun2015	Visual C++ 2015 libraries
+vcrun2017	Visual C++ 2017 libraries
+vcrun2019	Visual C++ 2019 libraries
+vcrun2022	Visual C++ 2022 libraries
+d3dcompiler_47
+dotnet45	.Net 4.5
+
+
+0128:err:winediag:ntlm_check_version ntlm_auth was not found or is outdated. Make sure that ntlm_auth >= 3.0.25 is in your path. Usually, you can find it in the winbind package of your distribution.
+0128:err:ntlm:ntlm_LsaApInitializePackage no NTLM support, expect problems
+
+0128:err:eventlog:ReportEventW L"Application: NinjaTrader.exe\nFramework Version: v4.0.30319\nDescription: The process was terminated due to an unhandled exception.\nException Info: System.ArgumentException\n   at NinjaTrader.Gui.Chart.ChartStyle.GetInstance(NinjaTrader.Gui.Chart.ChartStyleType)\n   at NinjaTrader.Gui.Ch"...
+0128:fixme:advapi:DeregisterEventSource (CAFE4242) stub
+wine: Unhandled exception 0xe0434352 in thread 128 at address 7B012436 (thread 0128), starting debugger...
+
+
+ninja001@doerl.de 	Krakel001	!!Alter2000!!	demo118720	Gbt6R2$_
+ninja002@doerl.de   Krakel002	!!Alter2000!!
+ninja003@doerl.de 								demo72590	At_6t@Q7
+ninja004@doerl.de 								demo148350	#_d2hT8P
+ninja005@doerl.de 								demo158340	37Z!mG$y
+ninja006@doerl.de 								demo158600	#_FqPx87

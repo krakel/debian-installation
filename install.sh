@@ -109,9 +109,10 @@ SOURCES_DIR='/etc/apt/sources.list.d'
 KEY_RING_DIR='/usr/share/keyrings'
 
 THIS_NAME=game
-THIS_IP=192.168.0.20
-THIS_DNS=192.168.0.1
-THIS_DEF=192.168.0.1
+THIS_IP=192.168.2.20
+THIS_BROADCAST=192.168.2.255
+THIS_DNS=192.168.2.1
+THIS_DEF=192.168.2.1
 THIS_DOMAIN='at-home'
 THIS_GIT_MAIL='uwe-git@doerl.de'
 
@@ -201,17 +202,17 @@ if [[ ! -z "$DO_SOURCE" ]]; then
 	touch $TMPFILE
 
 	cat <<- EOT > $TMPFILE
-		deb     http://deb.debian.org/debian               testing           main contrib non-free
-		deb-src http://deb.debian.org/debian               testing           main contrib non-free
+		deb     http://deb.debian.org/debian               testing           main contrib non-free non-free-firmware
+		deb-src http://deb.debian.org/debian               testing           main contrib non-free non-free-firmware
 
-		deb     http://deb.debian.org/debian               testing-updates   main contrib non-free
-		deb-src http://deb.debian.org/debian               testing-updates   main contrib non-free
+		deb     http://deb.debian.org/debian               testing-updates   main contrib non-free non-free-firmware
+		deb-src http://deb.debian.org/debian               testing-updates   main contrib non-free non-free-firmware
 
-		deb     http://security.debian.org/debian-security testing-security  main contrib non-free
-		deb-src http://security.debian.org/debian-security testing-security  main contrib non-free
+		deb     http://security.debian.org/debian-security testing-security  main contrib non-free non-free-firmware
+		deb-src http://security.debian.org/debian-security testing-security  main contrib non-free non-free-firmware
 
-		deb     http://deb.debian.org/debian               sid               main contrib non-free
-		deb-src http://deb.debian.org/debian               sid               main contrib non-free
+		deb     http://deb.debian.org/debian               sid               main contrib non-free non-free-firmware
+		deb-src http://deb.debian.org/debian               sid               main contrib non-free non-free-firmware
 	EOT
 
 	if [[ ! -f $ORIGINAL ]]; then
@@ -448,7 +449,7 @@ if [[ ! -z "$DO_AMD" ]]; then
 		# apt install libgl1-fglrx-glx-i386
 
 		apt install libgl1-mesa-dri libgl1-mesa-dri:i386
-		apt install libgl1-mesa-glx libgl1-mesa-glx:i386
+		apt install libgl1-mesa-glx/unstable libgl1-mesa-glx:i386/unstable
 		apt install mesa-vulkan-drivers mesa-vulkan-drivers:i386
 		apt install libvulkan1 libvulkan1:i386
 		apt install vulkan-utils
@@ -500,28 +501,27 @@ if [[ ! -z "$DO_SSH_AGENT" ]]; then
 				  echo "succeeded"
 				  chmod 600 $SSH_ENV
 				  . $SSH_ENV > /dev/null
-				  ssh-add $HOME/.ssh/id_rsa
-				  ssh-add $HOME/.ssh/git_rsa
-				  ssh-add $HOME/.ssh/ssh_rsa
+				  ssh-add $HOME/.ssh/id_rsa $HOME/.ssh/git_rsa $HOME/.ssh/ssh_rsa 2>/dev/null
 				}
 
 				function test_identities() {
-				  if ssh-add -l | grep "The agent has no identities" > /dev/null; then
-				    if ! ssh-add; then
-				      start_agent
-				    fi
+					ssh-add -l | grep "The agent has no identities" > /dev/null
+				  if [ $status -eq 0 ]; then
+				  	start_agent
 				  fi
 				}
 
 				if [ -n "$SSH_AGENT_PID" ]; then
-				  if ps -ef | grep $SSH_AGENT_PID | grep ssh-agent > /dev/null; then
+					s -ef | grep $SSH_AGENT_PID | grep ssh-agent > /dev/null
+				  if [ $status -eq 0 ]; then
 				    test_identities
 				  fi
 				else
 				  if [ -f $SSH_ENV ]; then
 				    . $SSH_ENV > /dev/null
 				  fi
-				  if ps -ef | grep $SSH_AGENT_PID | grep -v grep | grep ssh-agent > /dev/null; then
+				  ps -ef | grep $SSH_AGENT_PID | grep -v grep | grep ssh-agent > /dev/null
+				  if [ $status -eq 0 ]; then
 				    test_identities
 				  else
 				    start_agent
@@ -582,7 +582,7 @@ if [[ ! -z "$DO_KVM" ]]; then
 			# Configure bridge and give it a static ip
 			iface $theBridge inet static
 			  address         $THIS_IP
-			  broadcast       192.168.0.255
+			  broadcast       $THIS_BROADCAST
 			  netmask         255.255.255.0
 			  gateway         $THIS_DEF
 			  dns-nameservers $THIS_DNS
@@ -638,6 +638,7 @@ if [[ ! -z "$DO_KVM" ]]; then
 	apt install virtinst                  # a set of commandline tools to create virtual machines using libvirt
 	apt install virt-manager              # desktop application for managing virtual machines
 	apt install virt-top                  # a top-like utility for showing stats of virtualized domains.
+	apt install virtiofsd									# 
 	# apt install virt-viewer             # displaying the graphical console of a virtual machine (part of virtinst)
 
 	# apt install acpid                   # Advanced Configuration and Power Interface event daemon
@@ -719,7 +720,7 @@ LIBVIRT_IMG='/var/lib/libvirt/images'
 
 function isoInstallDebian() {
 	local debianImg='debian.qcow2'
-	local debianISO=$(ls -t $ISO_PATH/debian-$1*.iso 2>/dev/null | head -1)
+	local debianISO=$(ls -t $ISO_PATH/debian-live*.iso 2>/dev/null | head -1)
 	if [[ ! -f "$debianISO" ]]; then
 		echo 'missing iso!'
 		exit 1
@@ -728,21 +729,21 @@ function isoInstallDebian() {
 	virt-install \
 	  --virt-type  kvm \
 	  --name       $2 \
-	  --ram        2048 \
+	  --ram        4096 \
 	  --vcpus      2 \
-	  --os-variant debian10 \
+	  --os-variant debian12 \
 	  --hvm        \
 	  --rng        /dev/urandom \
 	  --network    bridge=$1,model=virtio \
 	  --graphics   spice \
 	  --cdrom      $debianISO \
-	  --disk       path=$LIBVIRT_IMG/$debianImg,size=40,bus=virtio,format=qcow2 \
-	  --filesystem /share,/sharepoint,type=default,mode=mapped
+	  --disk       path=$LIBVIRT_IMG/$debianImg,size=40,bus=virtio,format=qcow2
+#	  --filesystem /share,/sharepoint,type=default,mode=mapped
 }
 
 function isoInstallCentos() {
 	local centImg='centos8.qcow2'
-	local centISO=$(ls -t $ISO_PATH/CentOS-$1*.iso 2>/dev/null | head -1)
+	local centISO=$(ls -t $ISO_PATH/CentOS-*.iso 2>/dev/null | head -1)
 	if [[ ! -f "$centISO" ]]; then
 		echo 'missing iso!'
 		exit 1
@@ -787,13 +788,14 @@ function isoInstallWindows10() {
 	  --network    bridge=$1,model=virtio \
 	  --graphics   spice \
 	  --disk       path=$LIBVIRT_IMG/$win10Img,size=30,bus=virtio,format=qcow2 \
-	  --disk       $win10ISO,device=cdrom,bus=sata \
-	  --disk       $win10VFD,device=cdrom,bus=sata \
+	  --cdrom      $win10ISO \
+	  --cdrom      $win10VFD \
 	  --boot       hd,cdrom
-#	  --filesystem /share,/sharepoint,type=default,mode=mapped \
-#	  --cdrom      $win10ISO \
-#	  --cdrom      $win10VFD \
 }
+#	  --disk       $win10ISO,device=cdrom,bus=sata \
+#	  --disk       $win10VFD,device=cdrom,bus=sata \
+#	  --filesystem /share,/sharepoint,type=default,mode=mapped \
+#
 
 function isoInstallAndroid86() {
 	local androidImg='android9.img'
@@ -858,7 +860,7 @@ function isoImportVirtualBox() {
 if [[ ! -z "$DO_ISO" ]]; then
 	echo '######### install a iso'
 
-	isoInstallDebian    $BRIDGE bullseye
+	isoInstallDebian    $BRIDGE debian12.5
 #	isoInstallCentos    $BRIDGE 8
 #	isoInstallWindows10 $BRIDGE
 #	isoInstallAndroid86 $BRIDGE
@@ -889,7 +891,7 @@ if [[ ! -z "$DO_VIRTUAL_BOX" ]]; then
 #  dpkg -i virtualbox-ext-pack_6.1.0-1_all.deb
 
 #  addPgpKey 'oracle.gpg' 'https://www.virtualbox.org/download/oracle_vbox_2016.asc'
-#  echo "deb [signed-by=$KEY_RING_DIR/oracle.gpg] https://download.virtualbox.org/virtualbox/debian buster contrib" > $SOURCES_DIR/virtualbox.list
+#  echo "deb [signed-by=$KEY_RING_DIR/oracle.gpg] https://download.virtualbox.org/virtualbox/debian bookworm contrib" > $SOURCES_DIR/virtualbox.list
 #  apt update
 
 	apt install virtualbox/sid    # found at debian sid repository
@@ -1038,7 +1040,7 @@ fi
 #####################################################################
 #####################################################################
 ######### Samba
-# https://devconnected.com/how-to-install-samba-on-debian-10-buster/
+# https://devconnected.com/how-to-install-samba-on-debian-10-bookworm/
 if [[ ! -z "$DO_SAMBA" ]]; then
 	echo '######### install Samba Server'
 

@@ -17,20 +17,25 @@ Commands:
   twitch    twitch gui
   video     VideoLan
   webex     Webex
+  zoom      Zoom
 
   gpic      GPicview image viewer
   viewnior  Viewnior image viewer
   mirage    Mirage image viewer (best)
 
+  brave     Brave Browser
   chrome    Google Chrome
+  deluge    Deluge Torrent Client
   firefox   Firefox move profile
   mozilla   Firefox + Thunderbird
   thunder   Thunderbird move profile'
 }
 
 declare -A SELECT=(
+	[brave]=DO_BRAVE
 	[chatty]=DO_CHATTY
 	[chrome]=DO_CHROME
+	[deluge]=DO_DELUGE
 	[discord]=DO_DISCORD
 	[dream]=DO_DREAMBOX_EDIT
 	[firefox]=DO_FIREFOX
@@ -47,6 +52,7 @@ declare -A SELECT=(
 	[video]=DO_VIDEOLAN
 	[viewnior]=DO_VIEWNIOR
 	[webex]=DO_WEBEX
+	[zoom]=DO_ZOOM
 )
 
 if [[ $# -eq 0  ]]; then
@@ -121,7 +127,7 @@ if [[ ! -z "$DO_DISCORD" ]]; then
 	#echo "download_driver '' $DISCORD_URL $DISCORD_SRC"
 	DISCORD_DRV=$(downloadDriver '' $DISCORD_URL $DISCORD_SRC $DISCORD_LST)
 
-	apt install libgconf-2-4
+	#apt install libgconf-2-4
 
 	dpkg -i $DISCORD_DRV
 fi
@@ -176,7 +182,7 @@ fi
 if [[ ! -z "$DO_SPOTIFY" ]]; then
 	echo '######### install Spotify'
 
-	addPgpKey 'spotify.gpg' 'hkps://keyserver.ubuntu.com:443' '5E3C45D7B312C643'
+	addPgpKey 'spotify.gpg' 'hkps://keyserver.ubuntu.com:443' '7A3A762FAFD4A51F'
 	echo "deb [signed-by=$KEY_RING_DIR/spotify.gpg] http://repository.spotify.com stable non-free" > $SOURCES_DIR/spotify.list
 	apt update
 
@@ -204,10 +210,11 @@ if [[ ! -z "$DO_TWITCH_GUI" ]]; then
 
 	echo '######### install twitch gui'
 	TWITCH_URL='https://github.com/streamlink/streamlink-twitch-gui/releases'
-	TWITCH_REL='v1.11.0'
+	TWITCH_REL='v2.3.0'
 	TWITCH_DEF="streamlink-twitch-gui-${TWITCH_REL}-linux64.tar.gz"
 	TWITCH_SRC='streamlink-twitch-gui-*-linux64.tar.gz'
 	TWITCH_DRV=$(downloadDriver $TWITCH_URL $TWITCH_URL/download/$TWITCH_REL/$TWITCH_DEF $TWITCH_SRC)
+	echo $TWITCH_DRV
 
 	tar -xzvf $TWITCH_DRV -C /opt
 	apt install xdg-utils libgconf-2-4
@@ -258,6 +265,27 @@ fi
 
 #####################################################################
 #####################################################################
+######### Zoom
+if [[ ! -z "$DO_ZOOM" ]]; then
+	echo '######### install Zoom'
+	ZOOM_URL='https://us06web.zoom.us'
+	ZOOM_VER='5.12.2.4816'
+	ZOOM_SRC='zoom_amd64.deb'
+	ZOOM_LST='zoom*.deb'
+	echo "download_driver $ZOOM_URL/client/$ZOOM_VER $ZOOM_URL/client/$ZOOM_VER/$ZOOM_SRC $ZOOM_LST"
+	ZOOM_DRV=$(downloadDriver $ZOOM_URL/client/$ZOOM_VER $ZOOM_URL/client/$ZOOM_VER/$ZOOM_SRC $ZOOM_LST)
+
+	# https://us06web.zoom.us/linux/download/pubkey
+	#addPgpKey 'zoom.gpg' "$ZOOM_URL/linux/download/pubkey/package-signing-key.pub"
+	#echo "deb [arch=amd64 signed-by=$KEY_RING_DIR/webex.gpg] $ZOOM_URL xenial main" > $SOURCES_DIR/webex.list
+
+	echo $ZOOM_DRV
+	#apt update
+	apt install $ZOOM_DRV
+fi
+
+#####################################################################
+#####################################################################
 ######### GPicview image viewer
 if [[ ! -z "$DO_GPIC" ]]; then
 	echo '######### install GPicview'
@@ -286,13 +314,34 @@ fi
 
 #####################################################################
 #####################################################################
+######### Brave Browser
+if [[ ! -z "$DO_BRAVE" ]]; then
+	echo '######### install Brave Browser'
+	apt install software-properties-common apt-transport-https curl ca-certificates
+
+	BRAVE_URL='https://brave-browser-apt-release.s3.brave.com'
+	wget -qO- $BRAVE_URL/brave-browser-archive-keyring.gpg | gpg --dearmor | tee $KEY_RING_DIR/brave.gpg > /dev/null
+	# curl -fsSLo $KEY_RING_DIR/brave.gpg $BRAVE_URL/brave-browser-archive-keyring.gpg
+	# echo "deb [signed-by=$KEY_RING_DIR/brave-keyring.gpg] $BRAVE_URL/ stable main" | tee $SOURCES_DIR/brave.list
+
+	#addPgpKey 'brave.gpg' '$BRAVE_URL/brave-browser-archive-keyring.gpg'
+	echo "deb [arch=amd64 signed-by=$KEY_RING_DIR/brave.gpg] $BRAVE_URL/ stable main" > $SOURCES_DIR/brave.list
+	apt update
+
+	# apt install brave-browser
+fi
+
+#####################################################################
+#####################################################################
 ######### Chrome Browser
 if [[ ! -z "$DO_CHROME" ]]; then
 	echo '######### install Google Chrome'
 	apt install software-properties-common apt-transport-https wget ca-certificates gnupg2
 
-	addPgpKey 'chrome.gpg' 'https://dl.google.com/linux/linux_signing_key.pub'
-	echo "deb [arch=amd64 signed-by=$KEY_RING_DIR/chrome.gpg] http://dl.google.com/linux/chrome/deb/ stable main" > $SOURCES_DIR/chrome.list
+	CHROME_URL='https://dl.google.com/linux'
+
+	addPgpKey 'chrome.gpg' '$CHROME_URL/linux_signing_key.pub'
+	echo "deb [arch=amd64 signed-by=$KEY_RING_DIR/chrome.gpg] $CHROME_URL/chrome/deb/ stable main" > $SOURCES_DIR/chrome.list
 	apt update
 
 	apt install google-chrome-stable
@@ -383,6 +432,13 @@ if [[ ! -z "$DO_THUNDER" ]]; then
 	THUNDERBIRD_LINUX="$HOME_USER/.thunderbird"
 
 	mozillaCopyProfile 'Download/thunderbird.zip' $THUNDERBIRD_LINUX $THUNDERBIRD_WINDOWS
+fi
+
+#####################################################################
+#####################################################################
+######### Deluge Torrent Client
+if [[ ! -z "$DO_DELUGE" ]]; then
+	apt install deluge
 fi
 
 #####################################################################

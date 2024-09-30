@@ -14,6 +14,7 @@ Commands:
   dxvk      vulkan-based compatibility layer for Direct3D
   dnet      Microsoft .Net 4.6.1 (do not use)
   multimc   Minecraft MultiMC'
+  obs       OBS Studio
 }
 
 declare -A SELECT=(
@@ -21,6 +22,7 @@ declare -A SELECT=(
 	[dxvk]=DO_DXVK
 	[lutris]=DO_LUTRIS
 	[multimc]=DO_MULTI_MC
+	[obs]=DO_OBS
 	[steam]=DO_STEAM
 	[test]=DO_TEST
 	[wine]=DO_WINE
@@ -154,7 +156,7 @@ fi
 if [[ ! -z "$DO_STEAM" ]]; then
 	echo '######### install Steam'
 	STEAM_BUILDS='https://repo.steampowered.com/steam'
-#	addPgpKey 'steam.gpg' "$STEAM_BUILDS/archive/stable/steam.gpg"
+#	addPgpKey 'steam.gpg' "/archive/stable/steam.gpg"
 	addPgpKey 'steam.gpg' "$STEAM_BUILDS/archive/precise/steam.gpg"
 	cat <<- EOT > $SOURCES_DIR/steam.list
 		deb     [signed-by=$KEY_RING_DIR/steam.gpg] $STEAM_BUILDS stable steam
@@ -231,6 +233,115 @@ if [[ ! -z "$DO_MULTI_MC" ]]; then
 
 	dpkg --force-depends -i $MULTIMC_DRV
 	#apt install multimc
+fi
+
+#####################################################################
+#####################################################################
+if [[ ! -z "$DO_OBS" ]]; then
+	echo '######### install OBS Studio'
+
+	MULTIMEDIA_URL='https://www.deb-multimedia.org'
+	MULTIMEDIA_REL='2016.8.1_all'
+	MULTIMEDIA_DEF="deb-multimedia-keyring_$MULTIMEDIA_REL.deb"
+	MULTIMEDIA_SRC='deb-multimedia-keyring_*.deb'
+	MULTIMEDIA_DRV=$(downloadDriver $MULTIMEDIA_URL $MULTIMEDIA_URL/pool/main/d/deb-multimedia-keyring/$MULTIMEDIA_DEF $MULTIMEDIA_SRC)
+
+	dpkg -i $MULTIMEDIA_DRV
+
+	echo <<- EOT > $SOURCES_DIR/deb-multimedia.list
+		deb $MULTIMEDIA_URL testing main non-free
+		#deb $MULTIMEDIA_URL testing-backports main
+	EOT
+
+	apt update
+	apt upgade
+	apt upgrade -t testing
+
+	#apt install build-essential ccache clang clang-format cmake cmake-curses-gui curl fdkaac
+  #apt install fonts-roboto git glslang-dev glslang-tools glslc libasio-dev libasound2-dev libavcodec-dev libavdevice-dev
+  #apt install libavfilter-dev libavformat-dev libavutil-dev libcmocka-dev libcurl4-openssl-dev libdrm-dev libfdk-aac-dev
+  #apt install libfontconfig-dev libfreetype6-dev libgl1-mesa-dev libgles2-mesa libgles2-mesa-dev libglu1-mesa-dev
+  #apt install libglvnd-dev libjack-jackd2-dev libjansson-dev libluajit-5.1-dev libmbedtls-dev libpci-dev libpulse-dev
+  #apt install libqrcodegencpp-dev libqt6svg6-dev librist-dev libshaderc-dev libsndio-dev libspeexdsp-dev
+  #apt install libsrt-openssl-dev libswresample-dev libswscale-dev libudev-dev libv4l-dev libva-dev libvlc-dev libvpl-dev
+  #apt install libwayland-dev libwebsocketpp-dev libx11-dev libx11-xcb-dev libx264-dev libxaw7-dev libxcb1-dev
+  #apt install libxcb-composite0-dev libxcb-icccm4-dev libxcb-keysyms1-dev libxcb-randr0-dev libxcb-shm0-dev
+  #apt install libxcb-util-dev libxcb-xfixes0-dev libxcb-xinerama0-dev libxcb-xinput-dev libxcb-xkb-dev libxcb-xtest0-dev
+  #apt install libxcomposite-dev libxinerama-dev libxkbcommon-x11-dev libxkbfile-dev libxres-dev libxss-dev libxtst-dev
+  #apt install libxv-dev ninja-build nlohmann-json3-dev pkg-config python3-dev qt6-base-dev qt6-base-private-dev
+  #apt install qt6-image-formats-plugins qt6-wayland swig
+
+  apt install ccache clang clang-format cmake cmake-curses-gui fdkaac
+  apt install glslang-dev glslang-tools glslc
+  apt install libasio-dev libasound2-dev libavcodec-dev libavdevice-dev
+  apt install libavfilter-dev libavformat-dev libavutil-dev libcmocka-dev libcurl4-openssl-dev libdrm-dev libfdk-aac-dev
+  apt install libfontconfig-dev libfreetype-dev libgl1-mesa-dev libgles2-mesa-dev libglu1-mesa-dev
+  apt install libglvnd-dev libjack-jackd2-dev libjansson-dev libluajit-5.1-dev libmbedtls-dev libpci-dev libpulse-dev
+  apt install libqrcodegencpp-dev libqt6svg6-dev librist-dev libshaderc-dev libsndio-dev libspeexdsp-dev
+  apt install libsrt-openssl-dev libswresample-dev libswscale-dev libudev-dev libv4l-dev libva-dev libvlc-dev libvpl-dev
+  apt install libwayland-dev libwebsocketpp-dev libx11-dev libx11-xcb-dev libx264-dev libxaw7-dev libxcb1-dev
+  apt install libxcb-composite0-dev libxcb-icccm4-dev libxcb-keysyms1-dev libxcb-randr0-dev libxcb-shm0-dev
+  apt install libxcb-util-dev libxcb-xfixes0-dev libxcb-xinerama0-dev libxcb-xinput-dev libxcb-xkb-dev libxcb-xtest0-dev
+  apt install libxcomposite-dev libxinerama-dev libxkbcommon-x11-dev libxkbfile-dev libxres-dev libxss-dev libxtst-dev
+  apt install libssl-dev libxv-dev nlohmann-json3-dev
+  apt install ninja-build pkg-config python3-dev qt6-base-dev qt6-base-private-dev
+  apt install qt6-image-formats-plugins qt6-wayland swig
+
+  sudo -u $SUDO_USER wget -P Downloads/linux https://cdn-fastly.obsproject.com/downloads/cef_binary_5060_linux64.tar.bz2
+  sudo -u $SUDO_USER tar xf Downloads/linux/cef_binary_5060_linux64.tar.bz2
+
+	cd git
+
+	sudo -u $SUDO_USER git clone --recursive https://github.com/paullouisageneau/libdatachannel
+	cd libdatachannel
+	sudo -u $SUDO_USER rm -rf build
+	sudo -u $SUDO_USER cmake -B build -DUSE_GNUTLS=0 -DUSE_NICE=0 -DCMAKE_BUILD_TYPE=Release
+	cd build/
+	sudo -u $SUDO_USER make -j$(nproc)
+	sudo -u $SUDO_USER make install
+
+	cd $HOME_USER/git
+	sudo -u $SUDO_USER git clone --recursive https://github.com/obsproject/obs-studio
+	cd obs-studio
+	sudo -u $SUDO_USER rm -rf build
+
+	git branch -a
+	git tag -l | sort -V
+
+	#sudo -u $SUDO_USER git checkout master
+	sudo -u $SUDO_USER git checkout 30.0.2
+	#sudo -u $SUDO_USER git checkout 29.1.3
+
+git reset --hard HEAD
+git clean -f -f
+git pull
+git submodule init
+git submodule update
+
+	sudo -u $SUDO_USER cmake -S . -B build -G Ninja -DENABLE_PIPEWIRE=0 -DENABLE_BROWSER=1 -DLINUX_PORTABLE=0 -DENABLE_DECKLINK=0 \
+	  -DENABLE_JACK=1 -DENABLE_SERVICE_UPDATES=0 -DCEF_ROOT_DIR="$HOME_USER/Downloads/linux/cef_binary_5060_linux64" \
+	  -DBUILD_FOR_DISTRIBUTION=1 -DENABLE_ALSA=1 -DENABLE_LIBFDK=1 -DENABLE_PULSEAUDIO=0 \
+	  -DCMAKE_INSTALL_PREFIX=/usr -DENABLE_SNDIO=0 -DENABLE_WEBRTC=1 -DOAUTH_BASE_URL="http://127.0.0.1" \
+	  -DCALM_DEPRECATION=ON -DX11_Xaw_INCLUDE_PATH="/usr/include/X11/Xaw" -DENABLE_AJA=1
+
+	sudo -u $SUDO_USER ccmake -S . -B build -G Ninja -DENABLE_PIPEWIRE=0 -DENABLE_BROWSER=1 -DLINUX_PORTABLE=0 -DENABLE_DECKLINK=0 \
+	  -DENABLE_JACK=1 -DENABLE_SERVICE_UPDATES=0 -DCEF_ROOT_DIR="$HOME_USER/Downloads/linux/cef_binary_5060_linux64" \
+	  -DBUILD_FOR_DISTRIBUTION=1 -DENABLE_ALSA=1 -DENABLE_LIBFDK=1 -DENABLE_PULSEAUDIO=0 \
+	  -DCMAKE_INSTALL_PREFIX=/usr -DENABLE_SNDIO=0 -DENABLE_WEBRTC=1 -DOAUTH_BASE_URL="http://127.0.0.1" \
+	  -DCALM_DEPRECATION=ON -DX11_Xaw_INCLUDE_PATH="/usr/include/X11/Xaw" -DENABLE_AJA=1
+
+	# Then in ccmake, hit "c" twice to get options. Hit "t" for more pages of options. Hit "g" to generate.
+	# Compile it thusly. Nice to have ccache setup as it takes a pretty "long" time to build.
+
+	sudo -u $SUDO_USER cmake --build build -j$(nproc)
+	sudo -u $SUDO_USER cmake --build build --target package -j$(nproc)
+
+	ls -lh build/*.deb
+
+	#dpkg -i build/obs-studio-29.1.3-50-Linux.deb
+	#apt-mark hold obs-studio
+	#apt -f install
+
 fi
 
 #####################################################################

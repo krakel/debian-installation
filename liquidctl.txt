@@ -1,0 +1,51 @@
+liquidctl list
+		Device #0: Aquacomputer D5 Next (experimental)
+
+liquidctl list --verbose                   
+		Device #0: Aquacomputer D5 Next (experimental)
+		├── Vendor ID: 0x0c70
+		├── Product ID: 0xf00e
+		├── Release number: 0x0100
+		├── Serial number: 01138-03312
+		├── Bus: hid
+		├── Address: /dev/hidraw0
+		└── Driver: Aquacomputer
+
+liquidctl status
+		Aquacomputer D5 Next (experimental)
+		├── Liquid temperature     31.8  °C
+		├── Pump speed             4159  rpm
+		├── Pump power            12.03  W
+		├── Pump voltage          12.03  V
+		├── Pump current           1.00  A
+		├── Fan speed               746  rpm
+		├── Fan power              0.00  W
+		├── Fan voltage           12.12  V
+		├── Fan current            0.00  A
+		├── +5V voltage            5.04  V
+		└── +12V voltage          12.12  V
+
+liquidctl --match d5 initialize   
+		Aquacomputer D5 Next (experimental)
+		├── Firmware version           1024  
+		└── Serial number       01138-03312
+
+liquidctl --direct-access set fan speed  20 30  27 50  34 80  40 90  50 100
+liquidctl --direct-access set pump speed 75
+liquidctl --direct-access set pump speed 90
+
+
+  3840x2160 (0x87) 297.000MHz +HSync +VSync *current
+        h: width  3840 start 4016 end 4104 total 4400 skew    0 clock  67.50KHz
+        v: height 2160 start 2168 end 2178 total 2250           clock  30.00Hz
+
+cvt 3840 2160 60   
+# 3840x2160 59.98 Hz (CVT 8.29M9) hsync: 134.18 kHz; pclk: 712.75 MHz
+Modeline "3840x2160_60.00"  712.75  3840 4160 4576 5312  2160 2163 2168 2237 -hsync +vsync
+
+xrandr --newmode "3840x2160_60.00" 533.25 3840 3888 3920 4000 2160 2163 2168 2222 +HSync +VSync
+xrandr --newmode "3840x2160_60.00" 594.00 3840 4016 4104 4400 2160 2168 2178 2250 +HSync +VSync
+
+xrandr --newmode "3840x2160_60.00" 594.00 3840 4016 4104 4400 2160 2168 2178 2250 +HSync +VSync
+xrandr --addmode DisplayPort-1 3840x2160_60.00
+xrandr --output DisplayPort-1 --mode 3840x2160_60.00

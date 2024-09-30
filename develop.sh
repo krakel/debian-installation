@@ -95,19 +95,19 @@ if [[ ! -z "$DO_JAVA" ]]; then
 	apt install default-jre
 	apt install default-jdk
 
-	apt install openjdk-15-jdk
+	apt install openjdk-20-jdk
 	apt install openjdk-8-jdk
 
 	# https://www.oracle.com/java/technologies/javase-jdk8-downloads.html
 	# apt install oracle-java8-installer
 
-	JFROG_BUILDS='https://adoptopenjdk.jfrog.io/adoptopenjdk'
-	addPgpKey 'jfrog.gpg' "$JFROG_BUILDS/api/gpg/key/public"
-	echo "deb [signed-by=$KEY_RING_DIR/jfrog.gpg] $JFROG_BUILDS/deb/ buster main" > $SOURCES_DIR/jfrog.list
+	JFROG_BUILDS='https://packages.adoptium.net/artifactory'
+	addPgpKey 'adoptium.gpg' "$JFROG_BUILDS/api/gpg/key/public"
+	echo "deb [signed-by=$KEY_RING_DIR/adoptium.gpg] $JFROG_BUILDS/deb/ bookworm main" > $SOURCES_DIR/adoptium.list
 	apt update
 
-	apt install "adoptopenjdk-15-hotspot"
-	apt install "adoptopenjdk-8-hotspot"
+	apt install "temurin-20-jdk"
+	apt install "temurin-8-jdk"
 #  apt install "adoptopenjdk-8-hotspot-jre"
 #  apt install" adoptopenjdk-8-openj9-jre"
 fi
@@ -441,6 +441,7 @@ if [[ ! -z "$DO_SUBLIME" ]]; then
 
 	ln -s /opt/sublime_text/sublime_text /usr/bin/sublime_text
 
+	sudo -u $SUDO_USER mkdir -p "~/Desktop"
 	createDesktopEntry "sublime.desktop" <<- EOT
 		[Desktop Entry]
 		Version=1.0
