@@ -49,3 +49,34 @@ xrandr --newmode "3840x2160_60.00" 594.00 3840 4016 4104 4400 2160 2168 2178 225
 xrandr --newmode "3840x2160_60.00" 594.00 3840 4016 4104 4400 2160 2168 2178 2250 +HSync +VSync
 xrandr --addmode DisplayPort-1 3840x2160_60.00
 xrandr --output DisplayPort-1 --mode 3840x2160_60.00
+
+
+######### /etc/systemd/system/d5next.service
+
+[Unit]
+Description=d5next job
+
+[Service]
+Type=oneshot
+ExecStart=/bin/bash /usr/local/bin/d5next.sh
+
+######### /etc/systemd/system/d5next.timer
+
+[Unit]
+Description=d5next
+
+[Timer]
+OnUnitActiveSec=5s
+OnBootSec=5s
+Requires=d5next.service
+
+[Install]
+WantedBy=timers.target
+
+######### d5next content of d5next.sh
+
+#!/bin/bash
+echo `date` >> /tmp/2
+
+#########
+systemctl start d5next.timer

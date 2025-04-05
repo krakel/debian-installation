@@ -1,0 +1,6 @@
+[Unit]
+Description=d5next job
+
+[Service]
+Type=oneshot
+ExecStart=/bin/bash /usr/local/bin/d5next.sh

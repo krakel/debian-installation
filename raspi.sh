@@ -67,8 +67,8 @@ while [[ $# -gt 0 ]]; do
 done
 
 THIS_NAME=rasp1
-THIS_IP=192.168.0.10
-THIS_DEF=192.168.0.1
+THIS_IP=192.168.2.10
+THIS_DEF=192.168.2.1
 THIS_DOMAIN=at-home
 
 MY_DOMAIN=imhaus.ddns.net
@@ -306,7 +306,7 @@ if [[ ! -z "$DO_FLASH" ]]; then
 
 	ls -al $BOOT_LDR
 
-	BOOT_DRV=$(ls -t $BOOT_LDR/pieeprom*.bin 2>/dev/null | head -1)
+	BOOT_DRV=$(ls -t $BOOT_LDR/pieeprom*.bin 2>/dev/null | tail -1)
 	if [[ -f "$BOOT_DRV" ]]; then
 		continueNow "Do you want to install the firmware '$BOOT_DRV' now?"
 		rpi-eeprom-update -d -f "$BOOT_DRV"
@@ -383,7 +383,7 @@ if [[ ! -z "$DO_SSH" ]]; then
 		Subsystem sftp /usr/lib/ssh/sftp-server -f AUTHPRIV -l INFO
 		UsePAM yes
 
-		AllowGroups ssh
+		#AllowGroups ssh
 		AllowUsers $SUDO_USER
 		Compression delayed
 
@@ -396,7 +396,7 @@ if [[ ! -z "$DO_SSH" ]]; then
 	#F2B_CONF=/etc/fail2ban/jail.local
 	#apt install fail2ban
 	#cp /etc/fail2ban/jail.conf $F2B_CONF
-	#sed -i "s/^.?ignoreip.*/ignoreip 127.0.0.1/32 192.168.0.16/28" $F2B_CONF
+	#sed -i "s/^.?ignoreip.*/ignoreip 127.0.0.1/32 192.168.2.16/28" $F2B_CONF
 	#systemctl restart fail2ban
 
 	#ufw status numbered
@@ -476,7 +476,7 @@ if [[ ! -z "$DO_BIND" ]]; then
 			# The primary network interface
 			iface $thePort inet static
 			  address         $THIS_IP
-			  broadcast       192.168.0.255
+			  broadcast       192.168.2.255
 			  netmask         255.255.255.0
 			  gateway         $THIS_DEF
 			  dns-nameservers 127.0.0.1
@@ -541,7 +541,7 @@ if [[ ! -z "$DO_BIND" ]]; then
 		  127.0.0.0/8;    // 127.0.0.0 - 127.255.255.255
 
 		  // Private Network (RFC 1918) - LAN, WLAN etc.
-		  192.168.0.0/24; // 192.168.0.0 - 192.168.0.255
+		  192.168.2.0/24; // 192.168.2.0 - 192.168.2.255
 		};
 	EOT
 
@@ -552,7 +552,7 @@ if [[ ! -z "$DO_BIND" ]]; then
 		  allow-transfer { acl_trusted_transfer; };
 		};
 
-		zone "0.168.192.in-addr.arpa" {
+		zone "2.168.192.in-addr.arpa" {
 		  notify no;
 		  type master;
 		  file "/etc/bind/rev.raspi";
@@ -571,8 +571,7 @@ if [[ ! -z "$DO_BIND" ]]; then
 		@ IN NS $THIS_NAME.$THIS_DOMAIN.
 		  IN A  $THIS_IP
 		$THIS_NAME IN A $THIS_IP
-		game       IN A 192.168.0.20
-		work       IN A 192.168.0.30
+		game       IN A 192.168.2.20
 		router     IN A $THIS_DEF
 	EOT
 
@@ -589,7 +588,6 @@ if [[ ! -z "$DO_BIND" ]]; then
 
 		10 IN PTR $THIS_NAME.$THIS_DOMAIN.
 		20 IN PTR game.$THIS_DOMAIN.
-		30 IN PTR work.$THIS_DOMAIN.
 		1  IN PTR router.$THIS_DOMAIN.
 	EOT
 
@@ -803,6 +801,35 @@ if [[ ! -z "$DO_GIT" ]]; then
 	# git remote add origin [email protected]:/home/git/repositories/test
 	# git push origin master
 	# git clone [email protected]Server-IP:/home/git/repositories/test
+fi
+
+#####################################################################
+#####################################################################
+if [[ ! -z "$DO_RESCUE" ]]; then
+	echo '######### rescue a broken raspi'
+	mkdir -p /rescue
+	lsblk
+
+	mount /dev/sda2 /rescue
+	mount /dev/sda1 /rescue/boot
+
+	mount -t proc   proc /rescue/proc
+	mount -t sysfs  sys  /rescue/sys
+	mount -o bind   /dev /rescue/dev
+	mount -t devpts pts  /rescue/dev/pts
+
+	chroot /rescue
+
+	######################################
+
+	#exit
+	#umount /rescue/dev/pts
+	#umount /rescue/dev
+	#umount /rescue/sys
+	#umount /rescue/proc
+	
+	#umount /rescue/boot
+	#umount /rescue
 fi
 
 #####################################################################

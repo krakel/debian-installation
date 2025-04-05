@@ -182,7 +182,7 @@ fi
 if [[ ! -z "$DO_SPOTIFY" ]]; then
 	echo '######### install Spotify'
 
-	addPgpKey 'spotify.gpg' 'hkps://keyserver.ubuntu.com:443' '7A3A762FAFD4A51F'
+	addPgpKey 'spotify.gpg' 'hkps://keyserver.ubuntu.com:443' 'C85668DF69375001'
 	echo "deb [signed-by=$KEY_RING_DIR/spotify.gpg] http://repository.spotify.com stable non-free" > $SOURCES_DIR/spotify.list
 	apt update
 
