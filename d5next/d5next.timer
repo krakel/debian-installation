@@ -4,7 +4,6 @@ Description=d5next
 [Timer]
 OnUnitActiveSec=5s
 OnBootSec=5s
-Requires=d5next.service
 
 [Install]
 WantedBy=timers.target
