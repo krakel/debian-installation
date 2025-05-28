@@ -13,6 +13,8 @@ Commands:
   test      only script tests
 
   src       debian testing         (use this first)
+  ess       debian essential
+  sid       debian sid
   unstable  adding debian unstable (should nt be needed)
   amd       amd/ati driver         (1 reboot)
   nvidia    nvidia driver          (1 reboot)
@@ -23,6 +25,8 @@ Commands:
   agent     autostart ssh-agent
   cifs      Access Windows Share
   cifsk     Access Windows Share to KVM client
+  nfs       Network File System Server
+  nfsc      Network File System Client
   conky     lightweight free system monitor
   ohmyz     ohmyz shell extension
   samba     Samba Server, access from Windows (not used, I use only cifs)
@@ -55,6 +59,7 @@ declare -A SELECT=(
 	[cifs]=DO_CIFS
 	[cifsk]=DO_CIFS_KVM
 	[conky]=DO_CONKY
+	[ess]=DO_ESSENTIAL
 	[etcher]=DO_ETCHER
 	[express]=DO_EXPRESS
 	[hp]=DO_HP
@@ -62,6 +67,8 @@ declare -A SELECT=(
 	[kvm]=DO_KVM
 	[login]=DO_AUTO_LOGIN
 	[moka]=DO_MOKA
+	[nfs]=DO_NFS
+	[nfsc]=DO_NFSC
 	[nvidia2]=DO_NVIDIA_OFFICAL
 	[nvidia3]=DO_NVIDIA_REINSTALL
 	[nvidia]=DO_NVIDIA
@@ -71,6 +78,7 @@ declare -A SELECT=(
 	[samba]=DO_SAMBA
 	[sea]=DO_SEAFILE
 	[screen]=DO_SCREENSAVER
+	[sid]=DO_SID
 	[snap]=DO_SNAPSHOT
 	[src]=DO_SOURCE
 	[su]=ONLY_SUDOER
@@ -103,7 +111,8 @@ done
 SUDO_USER=$(logname)
 HOME_USER="/home/$SUDO_USER"
 
-SOURCES='/etc/apt/sources.list'
+SOURCES_OLD='/etc/apt/sources.list'
+SOURCES_NEW='/etc/apt/sources.list.d/debian.sources'
 SOURCES_DIR='/etc/apt/sources.list.d'
 
 KEY_RING_DIR='/usr/share/keyrings'
@@ -115,6 +124,8 @@ THIS_DNS=192.168.2.1
 THIS_DEF=192.168.2.1
 THIS_DOMAIN='at-home'
 THIS_GIT_MAIL='uwe-git@doerl.de'
+
+OTHERE_IP=192.168.2.35
 
 # I use the same name
 WIN_USER=$SUDO_USER             # change this to your windows user name
@@ -187,13 +198,18 @@ function createSudoCmd() {
 #####################################################################
 #####################################################################
 if [[ ! -z "$DO_SOURCE" ]]; then
-	if [[ ! -f $SOURCES ]]; then
-		echo "bad, missing file: $SOURCES"
+	if [[ -f $SOURCES_NEW ]]; then
+		SOURCES="$SOURCES_NEW"
+		BACKUP="$SOURCES_DIR/debian.sources.bak"
+		TMPFILE='/tmp/debian.sources'
+	else if [[ -f $SOURCES_OLD ]]; then
+		SOURCES="$SOURCES_OLD"
+		BACKUP='/etc/apt/sources.orig'
+		TMPFILE='/tmp/sources.list'
+	else
+		echo "bad, missing file: $SOURCES_OLD or $SOURCES_NEW"
 		exit 1
 	fi
-
-	ORIGINAL='/etc/apt/sources.orig'
-	TMPFILE='/tmp/sources.list'
 
 	if [[ -f $TMPFILE ]]; then
 		echo "delete old temp file: $TMPFILE"
@@ -201,35 +217,50 @@ if [[ ! -z "$DO_SOURCE" ]]; then
 	fi
 	touch $TMPFILE
 
-	cat <<- EOT > $TMPFILE
-		deb     http://deb.debian.org/debian               testing           main contrib non-free non-free-firmware
-		deb-src http://deb.debian.org/debian               testing           main contrib non-free non-free-firmware
+	if [[ -f $SOURCES_NEW ]]; then
+		cat <<- EOT > $TMPFILE
+			Types: deb deb-src
+			URIs: http://deb.debian.org/debian/
+			Suites: testing
+			Components: main contrib non-free non-free-firmware
+			Signed-By: /usr/share/keyrings/debian-archive-keyring.gpg
 
-		deb     http://deb.debian.org/debian               testing-updates   main contrib non-free non-free-firmware
-		deb-src http://deb.debian.org/debian               testing-updates   main contrib non-free non-free-firmware
+			Types: deb deb-src
+			URIs: http://deb.debian.org/debian/
+			Suites: testing-updates
+			Components: main contrib non-free non-free-firmware
+			Signed-By: /usr/share/keyrings/debian-archive-keyring.gpg
 
-		deb     http://security.debian.org/debian-security testing-security  main contrib non-free non-free-firmware
-		deb-src http://security.debian.org/debian-security testing-security  main contrib non-free non-free-firmware
+			Types: deb deb-src
+			URIs: http://security.debian.org/debian-security/
+			Suites: testing-security
+			Components: main contrib non-free non-free-firmware
+			Signed-By: /usr/share/keyrings/debian-archive-keyring.gpg
+		EOT
+	else
+		cat <<- EOT > $TMPFILE
+			deb     http://deb.debian.org/debian               testing           main contrib non-free non-free-firmware
+			deb-src http://deb.debian.org/debian               testing           main contrib non-free non-free-firmware
 
-		deb     http://deb.debian.org/debian               sid               main contrib non-free non-free-firmware
-		deb-src http://deb.debian.org/debian               sid               main contrib non-free non-free-firmware
-	EOT
+			deb     http://deb.debian.org/debian               testing-updates   main contrib non-free non-free-firmware
+			deb-src http://deb.debian.org/debian               testing-updates   main contrib non-free non-free-firmware
 
-	if [[ ! -f $ORIGINAL ]]; then
-		mv $SOURCES $ORIGINAL
+			deb     http://security.debian.org/debian-security testing-security  main contrib non-free non-free-firmware
+			deb-src http://security.debian.org/debian-security testing-security  main contrib non-free non-free-firmware
+		EOT
+	fi
+
+	if [[ ! -f $BACKUP ]]; then
+		mv $SOURCES $BACKUP
 	fi
 	mv $TMPFILE $SOURCES
 
-	cat <<- EOT > /etc/apt/preferences.d/debian-sid
-		Package: *
-		Pin: release n=testing
-		Pin-Priority: 900
+	apt update
+fi
 
-		Package: *
-		Pin: release n=sid
-		Pin-Priority: -10
-	EOT
-
+#####################################################################
+#####################################################################
+if [[ ! -z "$DO_ESSENTIAL" ]]; then
 	dpkg --add-architecture i386
 	apt update
 
@@ -248,9 +279,67 @@ fi
 
 #####################################################################
 #####################################################################
+if [[ ! -z "$DO_SID" ]]; then
+	if [[ -f $SOURCES_NEW ]]; then
+		SOURCES="$SOURCES_NEW"
+		BACKUP="$SOURCES_DIR/debian.sources.bak"
+	else if [[ -f $SOURCES_OLD ]]; then
+		SOURCES="$SOURCES_OLD"
+		BACKUP='/etc/apt/sources.orig'
+	else
+		echo "bad, missing file: $SOURCES_OLD or $SOURCES_NEW"
+		exit 1
+	fi
+	if grep -F -q "sid" $SOURCES ; then
+		echo "Debian sid already installed!"
+		exit 1
+	fi
+
+	if [[ ! -f $BACKUP ]]; then
+		cp $SOURCES $BACKUP
+	fi
+
+	if [[ -f $SOURCES_NEW ]]; then
+		cat <<- EOT >> $SOURCES
+
+			Types: deb deb-src
+			URIs: http://deb.debian.org/debian/
+			Suites: sid
+			Components: main contrib non-free non-free-firmware
+			Signed-By: /usr/share/keyrings/debian-archive-keyring.gpg
+		EOT
+	else
+		cat <<- EOT >> $SOURCES
+
+			deb     http://deb.debian.org/debian sid main contrib non-free non-free-firmware
+			deb-src http://deb.debian.org/debian sid main contrib non-free non-free-firmware
+		EOT
+	fi
+
+	cat <<- EOT > /etc/apt/preferences.d/debian-sid
+		Package: *
+		Pin: release n=testing
+		Pin-Priority: 900
+
+		Package: *
+		Pin: release n=sid
+		Pin-Priority: -10
+	EOT
+
+	apt update
+fi
+
+#####################################################################
+#####################################################################
 if [[ ! -z "$DO_UNSTABLE" ]]; then
-	if [[ ! -f $SOURCES ]]; then
-		echo "bad, missing file: $SOURCES"
+	if [[ -f $SOURCES_NEW ]]; then
+		SOURCES="$SOURCES_NEW"
+		BACKUP="$SOURCES_DIR/debian.sources.bak"
+	else if [[ -f $SOURCES_OLD ]]; then
+		SOURCES="$SOURCES_OLD"
+		BACKUP='/etc/apt/sources.orig'
+	else
+		echo "bad, missing file: $SOURCES_OLD or $SOURCES_NEW"
 		exit 1
 	fi
 	if grep -F -q "unstable" $SOURCES ; then
@@ -258,17 +347,26 @@ if [[ ! -z "$DO_UNSTABLE" ]]; then
 		exit 1
 	fi
 
-	OLDFILE='/etc/apt/sources.old'
-
-	if [[ ! -f $OLDFILE ]]; then
-		cp $SOURCES $OLDFILE
+	if [[ ! -f $BACKUP ]]; then
+		cp $SOURCES_OLD $BACKUP
 	fi
 
-	cat <<- EOT >> $SOURCES
+	if [[ -f $SOURCES_NEW ]]; then
+			cat <<- EOT >> $SOURCES
 
-		deb     http://deb.debian.org/debian               unstable          main contrib non-free
-		deb-src http://deb.debian.org/debian               unstable          main contrib non-free
-	EOT
+			Types: deb deb-src
+			URIs: http://deb.debian.org/debian/
+			Suites: unstable
+			Components: main contrib non-free
+			Signed-By: /usr/share/keyrings/debian-archive-keyring.gpg
+		EOT
+else
+		cat <<- EOT >> $SOURCES_OLD
+
+			deb     http://deb.debian.org/debian unstable main contrib non-free
+			deb-src http://deb.debian.org/debian unstable main contrib non-free
+		EOT
+	fi
 
 	cat <<- EOT > /etc/apt/preferences.d/debian-unstable
 		Package: *
@@ -303,7 +401,7 @@ if [[ ! -z "$DO_TOOLS" ]]; then
 	apt install fonts-clear-sans
 	apt install imagemagick
 	apt install ffmpeg
-	apt install youtube-dl
+	#apt install youtube-dl
 	apt autoremove
 
 	CLEAR_SANS_URL='https://www.fontsquirrel.com/fonts/download/clear-sans'
@@ -1194,6 +1292,95 @@ if [[ ! -z "$DO_CIFS" ]]; then
 
 	createSudoCmd "win-cmds" <<- EOT
 		$SUDO_USER ALL= NOPASSWD: $WIN_SHELL
+	EOT
+
+	df -h
+fi
+
+#####################################################################
+#####################################################################
+# https://www.howtoforge.de/anleitung/so-installierst-du-nfs-server-und-client-unter-debian-12/
+if [[ ! -z "$DO_NFS" ]]; then
+	echo '######### install Network File System Server'
+
+	apt install nfs-kernel-server nfs-common
+	systemctl is-enabled nfs-server
+	systemctl status nfs-server
+
+	#systemctl start nfs-server
+	#systemctl restart nfs-server
+	#systemctl stop nfs-server
+
+	echo 'sudo nano /etc/default/nfs-common'
+	echo 'NEED_STATD="no"'
+	echo 'NEED_IDMAPD="yes"'
+
+	echo 'sudo nano /etc/default/nfs-kernel-server'
+	echo 'RPCNFSDOPTS="-N 2 -N 3"'
+	echo 'RPCMOUNTDOPTS="--manage-gids -N 2 -N 3"'
+
+	echo 'sudo systemctl restart nfs-server'
+
+fi
+
+#####################################################################
+#####################################################################
+# https://www.howtoforge.de/anleitung/so-installierst-du-nfs-server-und-client-unter-debian-12/
+if [[ ! -z "$DO_NFSC" ]]; then
+	echo '######### install Network File System Client'
+
+	apt install nfs-common
+
+	mkdir -p /mnt/users
+	mkdir -p /mnt/data
+	mkdir -p /mnt/documents
+
+	mount.nfs4 $OTHERE_IP:/home      /mnt/users
+	mount.nfs4 $OTHERE_IP:/data      /mnt/data
+	mount.nfs4 $OTHERE_IP:/documents /mnt/documents
+
+	#mkdir -p /nfs
+	#sudo mount.nfs4 $OTHERE_IP:/ /mnt/nfs
+
+	if ! grep -F -q "$OTHERE_IP" /etc/fstab ; then
+		if [[ ! -f "/etc/fstab.old" ]]; then
+			cp /etc/fstab /etc/fstab.old
+		fi
+
+		cat <<- EOT >> /etc/fstab
+			$OTHERE_IP:/home      /mnt/users     nfs4 soft,intr,rsize=8192,wsize=8192
+			$OTHERE_IP:/data      /mnt/data      nfs4 soft,intr,rsize=8192,wsize=8192
+			$OTHERE_IP:/documents /mnt/documents nfs4 soft,intr,rsize=8192,wsize=8192
+			#$OTHERE_IP:/          /mnt/nfs       nfs4 soft,intr,rsize=8192,wsize=8192
+		EOT
+
+		systemctl daemon-reload
+		mount -a
+	fi
+
+	NFS_SHELL="/mnt/mount-$OTHERE_IP.sh"
+	cat <<- EOT > "$NFS_SHELL"
+		#!/bin/bash
+		mount.nfs4 $OTHERE_IP:/home      /mnt/users
+		mount.nfs4 $OTHERE_IP:/data      /mnt/data
+		mount.nfs4 $OTHERE_IP:/documents /mnt/documents
+	EOT
+	chmod +x $NFS_SHELL
+
+	createDesktopEntry "nfs-$OTHERE_IP.desktop" <<- EOT
+		[Desktop Entry]
+		Name=NFS Shares
+		Comment=mount nfs folder
+		Exec=bash -c "sudo $NFS_SHELL > /dev/null 2>&1 & xdg-open /mnt/data"
+		Icon=drive-removable-media
+		Terminal=false
+		Type=Application
+		Categories=System;Utility;FileTools;FileManager;
+		StartupNotify=true
+	EOT
+
+	createSudoCmd "nfs-cmds" <<- EOT
+		$SUDO_USER ALL= NOPASSWD: $NFS_SHELL
 	EOT
 
 	df -h

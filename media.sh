@@ -195,7 +195,7 @@ fi
 if [[ ! -z "$DO_TELEGRAM" ]]; then
 	echo '######### install Telegram'
 
-	apt install telegram-desktop
+	apt install telegram-desktop/unstable
 fi
 
 #####################################################################

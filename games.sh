@@ -8,6 +8,7 @@ Commands:
   help      this help
   test      only script tests
 
+  amdvlk    AMDVLK
   wine      Wine
   steam     Steam
   lutris    Lutris
@@ -18,6 +19,7 @@ Commands:
 }
 
 declare -A SELECT=(
+	[amdvlk]=DO_AMD_VLK
 	[dnet]=DO_DOT_NET
 	[dxvk]=DO_DXVK
 	[lutris]=DO_LUTRIS
@@ -68,6 +70,21 @@ fi
 #####################################################################
 # Gaming
 #####################################################################
+
+#####################################################################
+#####################################################################
+######### AMDVLK
+if [[ ! -z "$DO_AMD_VLK" ]]; then
+	echo '######### install AMDVLK'
+
+	# sudo wget -qO - http://repo.radeon.com/amdvlk/apt/debian/amdvlk.gpg.key | sudo apt-key add -
+	# sudo sh -c 'echo deb [arch=amd64,i386] http://repo.radeon.com/amdvlk/apt/debian/ bionic main > /etc/apt/sources.list.d/amdvlk.list'
+	AMDVLK_BUILDS='https://repo.radeon.com/amdvlk/apt/debian'
+	addPgpKey 'amdvlk.gpg' "$AMDVLK_BUILDS/amdvlk.gpg.key"
+	echo "deb [signed-by=$KEY_RING_DIR/amdvlk.gpg] $AMDVLK_BUILDS/ bionic main" > $SOURCES_DIR/amdvlk.list
+	apt update
+
+fi
 
 #####################################################################
 #####################################################################
