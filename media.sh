@@ -77,6 +77,7 @@ SUDO_USER=$(logname)
 HOME_USER="/home/$SUDO_USER"
 
 SOURCES_DIR='/etc/apt/sources.list.d'
+TRUSTED_DIR='/etc/apt/trusted.gpg.d'
 KEY_RING_DIR='/usr/share/keyrings'
 
 #####################################################################
@@ -168,7 +169,8 @@ if [[ ! -z "$DO_SIGNAL" ]]; then
 	SIGNAL_URL='https://updates.signal.org/desktop/apt'
 
 	addPgpKey 'signal.gpg' "$SIGNAL_URL/keys.asc"
-	echo "deb [arch=amd64 signed-by=$KEY_RING_DIR/signal.gpg] $SIGNAL_URL xenial main" > $SOURCES_DIR/signal.list
+	#echo "deb [arch=amd64 signed-by=$TRUSTED_DIR/signal.gpg] $SIGNAL_URL xenial main" > $SOURCES_DIR/signal.list
+	createSourceEntry 'signal' 'deb' $SIGNAL_URL 'xenial' 'main'
 
 	apt update
 	apt install signal-desktop
@@ -182,11 +184,13 @@ fi
 if [[ ! -z "$DO_SPOTIFY" ]]; then
 	echo '######### install Spotify'
 
-	addPgpKey 'spotify.gpg' 'hkps://keyserver.ubuntu.com:443' 'C85668DF69375001'
-	echo "deb [signed-by=$KEY_RING_DIR/spotify.gpg] http://repository.spotify.com stable non-free" > $SOURCES_DIR/spotify.list
+	addPgpKey 'spotify.gpg' 'https://download.spotify.com/debian/pubkey_5384CE82BA52C83A.asc'
+	#echo "deb [signed-by=$TRUSTED_DIR/spotify.gpg] http://repository.spotify.com stable non-free" > $SOURCES_DIR/spotify.list
+	createSourceEntry 'spotify' 'deb' 'https://repository.spotify.com/' 'stable' 'non-free'
+
 	apt update
 
-	apt install spotify-client
+	#apt install spotify-client
 fi
 
 #####################################################################
@@ -257,7 +261,7 @@ if [[ ! -z "$DO_WEBEX" ]]; then
 	WEBEX_DRV=$(downloadDriver $WEBEX_URL $WEBEX_URL/$WEBEX_SRC $WEBEX_LST)
 
 	#addPgpKey 'webex.gpg' "$WEBEX_URL/webex_public.key"
-	#echo "deb [arch=amd64 signed-by=$KEY_RING_DIR/webex.gpg] $WEBEX_URL xenial main" > $SOURCES_DIR/webex.list
+	#echo "deb [arch=amd64 signed-by=$TRUSTED_DIR/webex.gpg] $WEBEX_URL xenial main" > $SOURCES_DIR/webex.list
 
 	#apt update
 	apt install $WEBEX_DRV
@@ -277,7 +281,7 @@ if [[ ! -z "$DO_ZOOM" ]]; then
 
 	# https://us06web.zoom.us/linux/download/pubkey
 	#addPgpKey 'zoom.gpg' "$ZOOM_URL/linux/download/pubkey/package-signing-key.pub"
-	#echo "deb [arch=amd64 signed-by=$KEY_RING_DIR/webex.gpg] $ZOOM_URL xenial main" > $SOURCES_DIR/webex.list
+	#echo "deb [arch=amd64 signed-by=$TRUSTED_DIR/webex.gpg] $ZOOM_URL xenial main" > $SOURCES_DIR/webex.list
 
 	echo $ZOOM_DRV
 	#apt update
@@ -320,15 +324,16 @@ if [[ ! -z "$DO_BRAVE" ]]; then
 	apt install software-properties-common apt-transport-https curl ca-certificates
 
 	BRAVE_URL='https://brave-browser-apt-release.s3.brave.com'
-	wget -qO- $BRAVE_URL/brave-browser-archive-keyring.gpg | gpg --dearmor | tee $KEY_RING_DIR/brave.gpg > /dev/null
-	# curl -fsSLo $KEY_RING_DIR/brave.gpg $BRAVE_URL/brave-browser-archive-keyring.gpg
-	# echo "deb [signed-by=$KEY_RING_DIR/brave-keyring.gpg] $BRAVE_URL/ stable main" | tee $SOURCES_DIR/brave.list
+	wget -qO- $BRAVE_URL/brave-browser-archive-keyring.gpg | gpg --dearmor | tee $TRUSTED_DIR/brave.gpg > /dev/null
+	# curl -fsSLo $TRUSTED_DIR/brave.gpg $BRAVE_URL/brave-browser-archive-keyring.gpg
+	# echo "deb [signed-by=$TRUSTED_DIR/brave-keyring.gpg] $BRAVE_URL/ stable main" | tee $SOURCES_DIR/brave.list
 
 	#addPgpKey 'brave.gpg' '$BRAVE_URL/brave-browser-archive-keyring.gpg'
-	echo "deb [arch=amd64 signed-by=$KEY_RING_DIR/brave.gpg] $BRAVE_URL/ stable main" > $SOURCES_DIR/brave.list
+	#echo "deb [arch=amd64 signed-by=$TRUSTED_DIR/brave.gpg] $BRAVE_URL/ stable main" > $SOURCES_DIR/brave.list
+	createSourceEntry 'brave' 'deb' "$BRAVE_URL/" 'stable' 'main'
 	apt update
 
-	# apt install brave-browser
+	apt install brave-browser
 fi
 
 #####################################################################
@@ -336,12 +341,14 @@ fi
 ######### Chrome Browser
 if [[ ! -z "$DO_CHROME" ]]; then
 	echo '######### install Google Chrome'
-	apt install software-properties-common apt-transport-https wget ca-certificates gnupg2
+	#apt install software-properties-common apt-transport-https wget ca-certificates gnupg2
 
 	CHROME_URL='https://dl.google.com/linux'
 
-	addPgpKey 'chrome.gpg' '$CHROME_URL/linux_signing_key.pub'
-	echo "deb [arch=amd64 signed-by=$KEY_RING_DIR/chrome.gpg] $CHROME_URL/chrome/deb/ stable main" > $SOURCES_DIR/chrome.list
+	addPgpKey 'chrome.gpg' "$CHROME_URL/linux_signing_key.pub"
+	#echo "deb [arch=amd64 signed-by=$TRUSTED_DIR/chrome.gpg] $CHROME_URL/chrome/deb/ stable main" > $SOURCES_DIR/chrome.list
+	createSourceEntry 'chrome' 'deb' "$CHROME_URL/chrome/deb/" 'stable' 'main'
+
 	apt update
 
 	apt install google-chrome-stable

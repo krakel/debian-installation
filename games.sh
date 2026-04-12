@@ -12,10 +12,11 @@ Commands:
   wine      Wine
   steam     Steam
   lutris    Lutris
+  game      GameMode
   dxvk      vulkan-based compatibility layer for Direct3D
   dnet      Microsoft .Net 4.6.1 (do not use)
-  multimc   Minecraft MultiMC'
-  obs       OBS Studio
+  multimc   Minecraft MultiMC
+  obs       OBS Studio'
 }
 
 declare -A SELECT=(
@@ -28,6 +29,7 @@ declare -A SELECT=(
 	[steam]=DO_STEAM
 	[test]=DO_TEST
 	[wine]=DO_WINE
+	[game]=DO_GAMEMODE
 )
 
 if [[ $# -eq 0  ]]; then
@@ -52,6 +54,7 @@ SUDO_USER=$(logname)
 HOME_USER="/home/$SUDO_USER"
 
 SOURCES_DIR='/etc/apt/sources.list.d'
+TRUSTED_DIR='/etc/apt/trusted.gpg.d'
 KEY_RING_DIR='/usr/share/keyrings'
 
 #####################################################################
@@ -81,7 +84,8 @@ if [[ ! -z "$DO_AMD_VLK" ]]; then
 	# sudo sh -c 'echo deb [arch=amd64,i386] http://repo.radeon.com/amdvlk/apt/debian/ bionic main > /etc/apt/sources.list.d/amdvlk.list'
 	AMDVLK_BUILDS='https://repo.radeon.com/amdvlk/apt/debian'
 	addPgpKey 'amdvlk.gpg' "$AMDVLK_BUILDS/amdvlk.gpg.key"
-	echo "deb [signed-by=$KEY_RING_DIR/amdvlk.gpg] $AMDVLK_BUILDS/ bionic main" > $SOURCES_DIR/amdvlk.list
+	#exit
+	#echo "deb [signed-by=$TRUSTED_DIR/amdvlk.gpg] $AMDVLK_BUILDS/ bionic main" > $SOURCES_DIR/amdvlk.list
 	apt update
 
 fi
@@ -98,7 +102,7 @@ if [[ ! -z "$DO_WINE" ]]; then
 	# repositories and images created with the Open Build Service
 	# OBS_URL='https://download.opensuse.org/repositories/Emulators:/Wine:/Debian/Debian_Testing_standard'
 	# addPgpKey 'wine.gpg' "https://$OBS_URL/Release.key"
-	# echo 'deb [signed-by=$KEY_RING_DIR/wine.gpg] http://$OBS_URL ./' > $SOURCES_DIR/wine-obs.list
+	# echo 'deb [signed-by=$TRUSTED_DIR/wine.gpg] http://$OBS_URL ./' > $SOURCES_DIR/wine-obs.list
 	# apt update
 
 	# LIB_SDL=libsdl2-2.0-0_2.0.10+dfsg1-1_amd64.deb
@@ -117,7 +121,8 @@ if [[ ! -z "$DO_WINE" ]]; then
 
 	WINE_BUILDS='https://dl.winehq.org/wine-builds'
 	addPgpKey 'wineHQ.gpg' "$WINE_BUILDS/winehq.key"
-	echo "deb [signed-by=$KEY_RING_DIR/wineHQ.gpg] $WINE_BUILDS/debian/ bookworm main" > $SOURCES_DIR/wine.list
+	#echo "deb [signed-by=$TRUSTED_DIR/wineHQ.gpg] $WINE_BUILDS/debian/ bookworm main" > $SOURCES_DIR/wine.list
+	createSourceEntry 'wine' 'deb' "$WINE_BUILDS/debian/" 'bookworm' 'main' 'wineHQ.gpg'
 	# echo "deb $WINE_BUILDS/debian/ testing  main" > $SOURCES_DIR/wine.list # <-- broken, not working
 	apt update
 
@@ -175,10 +180,12 @@ if [[ ! -z "$DO_STEAM" ]]; then
 	STEAM_BUILDS='https://repo.steampowered.com/steam'
 #	addPgpKey 'steam.gpg' "/archive/stable/steam.gpg"
 	addPgpKey 'steam.gpg' "$STEAM_BUILDS/archive/precise/steam.gpg"
-	cat <<- EOT > $SOURCES_DIR/steam.list
-		deb     [signed-by=$KEY_RING_DIR/steam.gpg] $STEAM_BUILDS stable steam
-		deb-src [signed-by=$KEY_RING_DIR/steam.gpg] $STEAM_BUILDS stable steam
-	EOT
+	#exit
+	#cat <<- EOT > $SOURCES_DIR/steam.list
+	#	deb     [signed-by=$TRUSTED_DIR/steam.gpg] $STEAM_BUILDS stable steam
+	#	deb-src [signed-by=$TRUSTED_DIR/steam.gpg] $STEAM_BUILDS stable steam
+	#EOT
+	createSourceEntry 'steam' 'deb deb-src' "$STEAM_BUILDS/" 'stable' 'steam'
 
 	apt update
 #  apt install libgl1-mesa-dri libgl1-mesa-dri:i386
@@ -197,9 +204,10 @@ fi
 ######### Lutris
 if [[ ! -z "$DO_LUTRIS" ]]; then
 	echo '######### install Lutris'
-	LUTRIS_URL='https://download.opensuse.org/repositories/home:/strycore/Debian_Testing'
-	addPgpKey 'lutris.gpg' "$LUTRIS_URL/Release.key"
-	echo "deb [signed-by=$KEY_RING_DIR/lutris.gpg] $LUTRIS_URL/ ./" > $SOURCES_DIR/lutris.list
+	LUTRIS_URL='https://download.opensuse.org/repositories/home:/strycore:/lutris/Debian_13'
+	#addPgpKey 'lutris.gpg' "$LUTRIS_URL/Release.key"
+	createSourceEntry 'lutris' 'deb' "$LUTRIS_URL/" './'
+
 	apt update
 	apt install lutris
 	apt install gamemode
@@ -211,6 +219,9 @@ if [[ ! -z "$DO_LUTRIS" ]]; then
 	echo "LD_PRELOAD    = $LUTRIS_PRE"
 	echo "mesa_glthread = true"
 
+
+# echo -e "Types: deb\nURIs: https://download.opensuse.org/repositories/home:/strycore:/lutris/Debian_13/\nSuites: ./\nComponents: \nSigned-By: /etc/apt/keyrings/lutris.gpg" | sudo tee /etc/apt/sources.list.d/lutris.sources > /dev/null
+# wget -q -O- https://download.opensuse.org/repositories/home:/strycore:/lutris/Debian_13/Release.key | sudo gpg --dearmor -o /etc/apt/keyrings/lutris.gpg
 #	wget https://cdn.discordapp.com/attachments/538903130704838656/796102070825779250/dxvk_versions.json -P $HOME/.local/share/lutris/runtime/dxvk
 fi
 
@@ -232,6 +243,18 @@ if [[ ! -z "$DO_DOT_NET" ]]; then
 	env WINEPREFIX=winedotnet winetricks dotnet461 corefonts
 fi
 
+#####################################################################
+#####################################################################
+if [[ ! -z "$DO_GAMEMODE" ]]; then
+	echo '######### install GameMode'
+	apt install gamemode
+	apt install linux-cpupower
+  adduser $SUDO_USER gamemode
+  exho 'edit $HOME/.config/gamemode.ini
+  	[custom]
+		start=xfconf-query -c xfwm4 -p /general/use_compositing -s false
+		end=xfconf-query -c xfwm4 -p /general/use_compositing -s true'
+fi
 #####################################################################
 #####################################################################
 ######### MultiMC
@@ -263,12 +286,15 @@ if [[ ! -z "$DO_OBS" ]]; then
 	MULTIMEDIA_SRC='deb-multimedia-keyring_*.deb'
 	MULTIMEDIA_DRV=$(downloadDriver $MULTIMEDIA_URL $MULTIMEDIA_URL/pool/main/d/deb-multimedia-keyring/$MULTIMEDIA_DEF $MULTIMEDIA_SRC)
 
+	#addPgpKey 'deb-multimedia.gpg' "$MULTIMEDIA_URL/Release.key"
+	#exit
 	dpkg -i $MULTIMEDIA_DRV
 
-	echo <<- EOT > $SOURCES_DIR/deb-multimedia.list
-		deb $MULTIMEDIA_URL testing main non-free
-		#deb $MULTIMEDIA_URL testing-backports main
-	EOT
+	#echo <<- EOT > $SOURCES_DIR/deb-multimedia.list
+	#	deb $MULTIMEDIA_URL testing main non-free
+	#	#deb $MULTIMEDIA_URL testing-backports main
+	#EOT
+	createSourceEntry 'deb-multimedia' 'deb deb-src' "$MULTIMEDIA_URL/" 'testing' 'main'
 
 	apt update
 	apt upgade

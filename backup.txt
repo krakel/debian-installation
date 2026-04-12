@@ -1,0 +1,5 @@
+plain;Star_Tech;/home/minecraft/jungs/Star_Tech/backups
+plain;enshrouded;/home/steam/maedels/enshrouded/savegame
+plain;conan;/home/steam/maedels/conan/ConanSandbox/Saved
+plain;Mods;/home/steam/maedels/Mods
+plain;Foundry;/home/steam/.wine/drive_c/users/steam/AppData/LocalLow/Channel\ 3\ Entertainment/FoundryDedicatedServer/save/DummbackenWorld

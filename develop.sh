@@ -64,6 +64,7 @@ SUDO_USER=$(logname)
 HOME_USER="/home/$SUDO_USER"
 
 SOURCES_DIR='/etc/apt/sources.list.d'
+TRUSTED_DIR='/etc/apt/trusted.gpg.d'
 KEY_RING_DIR='/usr/share/keyrings'
 
 if [[ $(id -u) != 0 ]]; then
@@ -103,7 +104,8 @@ if [[ ! -z "$DO_JAVA" ]]; then
 
 	JFROG_BUILDS='https://packages.adoptium.net/artifactory'
 	addPgpKey 'adoptium.gpg' "$JFROG_BUILDS/api/gpg/key/public"
-	echo "deb [signed-by=$KEY_RING_DIR/adoptium.gpg] $JFROG_BUILDS/deb/ bookworm main" > $SOURCES_DIR/adoptium.list
+	#echo "deb [signed-by=$TRUSTED_DIR/adoptium.gpg] $JFROG_BUILDS/deb/ bookworm main" > $SOURCES_DIR/adoptium.list
+	createSourceEntry 'adoptium' 'deb' "$JFROG_BUILDS/deb/" 'bookworm' 'main'
 	apt update
 
 	apt install "temurin-20-jdk"
@@ -190,7 +192,8 @@ if [[ ! -z "$DO_SBT" ]]; then
 	echo '######### install sbt'
 
 	addPgpKey 'sbt.gpg' 'https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x2EE0EA64E40A89B84B2DF73499E82A75642AC823'
-	echo "deb [signed-by=$KEY_RING_DIR/sbt.gpg] https://dl.bintray.com/sbt/debian /" > $SOURCES_DIR/sbt.list
+	#echo "deb [signed-by=$TRUSTED_DIR/sbt.gpg] https://dl.bintray.com/sbt/debian /" > $SOURCES_DIR/sbt.list
+	createSourceEntry 'sbt' 'deb' 'https://dl.bintray.com/sbt/debian/' 'stable' 'main'
 
 	apt update
 	apt install sbt
@@ -434,7 +437,9 @@ if [[ ! -z "$DO_SUBLIME" ]]; then
 	echo '######### install Sublime editor'
 
 	addPgpKey 'sublime.gpg' 'https://download.sublimetext.com/sublimehq-pub.gpg'
-	echo "deb [signed-by=$KEY_RING_DIR/sublime.gpg] https://download.sublimetext.com/ apt/stable/" > $SOURCES_DIR/sublime.list
+	#exit
+	#echo "deb [signed-by=$TRUSTED_DIR/sublime.gpg] https://download.sublimetext.com/ apt/stable/" > $SOURCES_DIR/sublime.list
+	createSourceEntry 'sublime' 'deb' 'https://download.sublimetext.com/' 'stable' 'main'
 	apt update
 
 	apt install sublime-text

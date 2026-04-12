@@ -13,7 +13,9 @@ for file; do
     if [ ! -e $file ]; then
       continue
     fi
-    to_name=$(echo $file | cut -f1 -d.)".jpg"
+    to_name=${file%.*}".jpg"
+    #echo $file > "log.txt"
+    #echo $to_name >> "log.txt"
     #convert -resize $resize% -quality $QUALITY "${file}" "${to_name}"
     convert "${file}" -quality 75 "${to_name}"
 done

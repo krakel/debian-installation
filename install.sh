@@ -115,6 +115,7 @@ SOURCES_OLD='/etc/apt/sources.list'
 SOURCES_NEW='/etc/apt/sources.list.d/debian.sources'
 SOURCES_DIR='/etc/apt/sources.list.d'
 
+TRUSTED_DIR='/etc/apt/trusted.gpg.d'
 KEY_RING_DIR='/usr/share/keyrings'
 
 THIS_NAME=game
@@ -202,7 +203,7 @@ if [[ ! -z "$DO_SOURCE" ]]; then
 		SOURCES="$SOURCES_NEW"
 		BACKUP="$SOURCES_DIR/debian.sources.bak"
 		TMPFILE='/tmp/debian.sources'
-	else if [[ -f $SOURCES_OLD ]]; then
+	elif [[ -f $SOURCES_OLD ]]; then
 		SOURCES="$SOURCES_OLD"
 		BACKUP='/etc/apt/sources.orig'
 		TMPFILE='/tmp/sources.list'
@@ -280,16 +281,8 @@ fi
 #####################################################################
 #####################################################################
 if [[ ! -z "$DO_SID" ]]; then
-	if [[ -f $SOURCES_NEW ]]; then
-		SOURCES="$SOURCES_NEW"
-		BACKUP="$SOURCES_DIR/debian.sources.bak"
-	else if [[ -f $SOURCES_OLD ]]; then
-		SOURCES="$SOURCES_OLD"
-		BACKUP='/etc/apt/sources.orig'
-	else
-		echo "bad, missing file: $SOURCES_OLD or $SOURCES_NEW"
-		exit 1
-	fi
+	SOURCES="$SOURCES_DIR/sid.sources"
+	BACKUP="$SOURCES_DIR/sid.sources.bak"
 	if grep -F -q "sid" $SOURCES ; then
 		echo "Debian sid already installed!"
 		exit 1
@@ -299,22 +292,7 @@ if [[ ! -z "$DO_SID" ]]; then
 		cp $SOURCES $BACKUP
 	fi
 
-	if [[ -f $SOURCES_NEW ]]; then
-		cat <<- EOT >> $SOURCES
-
-			Types: deb deb-src
-			URIs: http://deb.debian.org/debian/
-			Suites: sid
-			Components: main contrib non-free non-free-firmware
-			Signed-By: /usr/share/keyrings/debian-archive-keyring.gpg
-		EOT
-	else
-		cat <<- EOT >> $SOURCES
-
-			deb     http://deb.debian.org/debian sid main contrib non-free non-free-firmware
-			deb-src http://deb.debian.org/debian sid main contrib non-free non-free-firmware
-		EOT
-	fi
+	createSourceEntry 'chrome' 'deb deb-src' 'http://deb.debian.org/debian/' 'sid' 'main contrib non-free non-free-firmware' 'debian-archive-keyring.gpg'
 
 	cat <<- EOT > /etc/apt/preferences.d/debian-sid
 		Package: *
@@ -335,7 +313,7 @@ if [[ ! -z "$DO_UNSTABLE" ]]; then
 	if [[ -f $SOURCES_NEW ]]; then
 		SOURCES="$SOURCES_NEW"
 		BACKUP="$SOURCES_DIR/debian.sources.bak"
-	else if [[ -f $SOURCES_OLD ]]; then
+	elif [[ -f $SOURCES_OLD ]]; then
 		SOURCES="$SOURCES_OLD"
 		BACKUP='/etc/apt/sources.orig'
 	else
@@ -989,7 +967,7 @@ if [[ ! -z "$DO_VIRTUAL_BOX" ]]; then
 #  dpkg -i virtualbox-ext-pack_6.1.0-1_all.deb
 
 #  addPgpKey 'oracle.gpg' 'https://www.virtualbox.org/download/oracle_vbox_2016.asc'
-#  echo "deb [signed-by=$KEY_RING_DIR/oracle.gpg] https://download.virtualbox.org/virtualbox/debian bookworm contrib" > $SOURCES_DIR/virtualbox.list
+#  echo "deb [signed-by=$TRUSTED_DIR/oracle.gpg] https://download.virtualbox.org/virtualbox/debian bookworm contrib" > $SOURCES_DIR/virtualbox.list
 #  apt update
 
 	apt install virtualbox/sid    # found at debian sid repository
@@ -1489,7 +1467,8 @@ if [[ ! -z "$DO_ETCHER" ]]; then
 	echo '######### install Etcher.io'
 
 	addPgpKey 'etcher.gpg' 'hkps://keyserver.ubuntu.com:443' '379CE192D401AB61'
-	echo "deb [signed-by=$KEY_RING_DIR/etcher.gpg] https://deb.etcher.io stable etcher" > $SOURCES_DIR/etcher.list
+	#echo "deb [signed-by=$TRUSTED_DIR/etcher.gpg] https://deb.etcher.io stable etcher" > $SOURCES_DIR/etcher.list
+	createSourceEntry 'etcher' 'deb' 'https://deb.etcher.io/' 'stable' 'etcher'
 
 	apt update
 	apt install balena-etcher-electron
@@ -1503,7 +1482,8 @@ if [[ ! -z "$DO_SEAFILE" ]]; then
 	SEAFILE_URL='https://linux-clients.seafile.com'
 
 	addPgpKey 'seafile.gpg' "$SEAFILE_URL/seafile.asc"
-	echo "deb [arch=amd64 signed-by=$KEY_RING_DIR/seafile.gpg] $SEAFILE_URL/seafile-deb/bullseye/ stable main" > $SOURCES_DIR/seafile.list
+	#echo "deb [arch=amd64 signed-by=$TRUSTED_DIR/seafile.gpg] $SEAFILE_URL/seafile-deb/bullseye/ stable main" > $SOURCES_DIR/seafile.list
+	createSourceEntry 'seafile' 'deb' "$SEAFILE_URL/seafile-deb/bullseye/" 'stable' 'main'
 
 	apt update
 	apt install seafile-gui
@@ -1617,7 +1597,7 @@ if [[ ! -z "$DO_TEST" ]]; then
   #gpg --no-default-keyring --keyring /usr/share/keyrings/$gpgFile --import
 	wget -nv $gpgServer -O - | gpg --no-default-keyring --keyring /usr/share/keyrings/$gpgFile --import
 	#wget -nv $gpgServer -O - | gpg --dearmor > /usr/share/keyrings/$gpgFile
-	#gpg --export                      --keyring /usr/share/keyrings/$gpgFile > /etc/apt/trusted.gpg.d/$gpgFile
-	gpg --export --no-default-keyring --keyring /usr/share/keyrings/$gpgFile > /etc/apt/trusted.gpg.d/$gpgFile
+	#gpg --export                      --keyring /usr/share/keyrings/$gpgFile > $TRUSTED_DIR/$gpgFile
+	gpg --export --no-default-keyring --keyring /usr/share/keyrings/$gpgFile > $TRUSTED_DIR/$gpgFile
 
 fi
