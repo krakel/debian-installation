@@ -78,7 +78,7 @@ HOME_USER="/home/$SUDO_USER"
 
 SOURCES_DIR='/etc/apt/sources.list.d'
 TRUSTED_DIR='/etc/apt/trusted.gpg.d'
-KEY_RING_DIR='/usr/share/keyrings'
+KEY_RING_DIR='/etc/apt/keyrings'
 
 #####################################################################
 ## some functions
@@ -168,6 +168,7 @@ if [[ ! -z "$DO_SIGNAL" ]]; then
 	echo '######### install Signal'
 	SIGNAL_URL='https://updates.signal.org/desktop/apt'
 
+	rm $SOURCES_DIR/signal.sources
 	addPgpKey 'signal.gpg' "$SIGNAL_URL/keys.asc"
 	#echo "deb [arch=amd64 signed-by=$TRUSTED_DIR/signal.gpg] $SIGNAL_URL xenial main" > $SOURCES_DIR/signal.list
 	createSourceEntry 'signal' 'deb' $SIGNAL_URL 'xenial' 'main'
@@ -184,6 +185,7 @@ fi
 if [[ ! -z "$DO_SPOTIFY" ]]; then
 	echo '######### install Spotify'
 
+	rm $SOURCES_DIR/spotify.sources
 	addPgpKey 'spotify.gpg' 'https://download.spotify.com/debian/pubkey_5384CE82BA52C83A.asc'
 	#echo "deb [signed-by=$TRUSTED_DIR/spotify.gpg] http://repository.spotify.com stable non-free" > $SOURCES_DIR/spotify.list
 	createSourceEntry 'spotify' 'deb' 'https://repository.spotify.com/' 'stable' 'non-free'
@@ -323,6 +325,7 @@ if [[ ! -z "$DO_BRAVE" ]]; then
 	echo '######### install Brave Browser'
 	apt install software-properties-common apt-transport-https curl ca-certificates
 
+	rm $SOURCES_DIR/brave.sources
 	BRAVE_URL='https://brave-browser-apt-release.s3.brave.com'
 	wget -qO- $BRAVE_URL/brave-browser-archive-keyring.gpg | gpg --dearmor | tee $TRUSTED_DIR/brave.gpg > /dev/null
 	# curl -fsSLo $TRUSTED_DIR/brave.gpg $BRAVE_URL/brave-browser-archive-keyring.gpg
@@ -343,8 +346,8 @@ if [[ ! -z "$DO_CHROME" ]]; then
 	echo '######### install Google Chrome'
 	#apt install software-properties-common apt-transport-https wget ca-certificates gnupg2
 
+	rm $SOURCES_DIR/chrome.sources
 	CHROME_URL='https://dl.google.com/linux'
-
 	addPgpKey 'chrome.gpg' "$CHROME_URL/linux_signing_key.pub"
 	#echo "deb [arch=amd64 signed-by=$TRUSTED_DIR/chrome.gpg] $CHROME_URL/chrome/deb/ stable main" > $SOURCES_DIR/chrome.list
 	createSourceEntry 'chrome' 'deb' "$CHROME_URL/chrome/deb/" 'stable' 'main'

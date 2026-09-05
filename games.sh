@@ -55,7 +55,7 @@ HOME_USER="/home/$SUDO_USER"
 
 SOURCES_DIR='/etc/apt/sources.list.d'
 TRUSTED_DIR='/etc/apt/trusted.gpg.d'
-KEY_RING_DIR='/usr/share/keyrings'
+KEY_RING_DIR='/etc/apt/keyrings'
 
 #####################################################################
 ## some functions
@@ -119,6 +119,7 @@ if [[ ! -z "$DO_WINE" ]]; then
 	# winehq-staging:   Staging builds contain many experimental patches intended to test some features or fix compatibility issues.
 	# winehq-devel:     Developer builds are in-development, cutting edge versions.
 
+	rm $SOURCES_DIR/wine.sources
 	WINE_BUILDS='https://dl.winehq.org/wine-builds'
 	addPgpKey 'wineHQ.gpg' "$WINE_BUILDS/winehq.key"
 	#echo "deb [signed-by=$TRUSTED_DIR/wineHQ.gpg] $WINE_BUILDS/debian/ bookworm main" > $SOURCES_DIR/wine.list
@@ -177,10 +178,11 @@ fi
 ######### Steam
 if [[ ! -z "$DO_STEAM" ]]; then
 	echo '######### install Steam'
+
+	rm $SOURCES_DIR/steam.sources
 	STEAM_BUILDS='https://repo.steampowered.com/steam'
 #	addPgpKey 'steam.gpg' "/archive/stable/steam.gpg"
 	addPgpKey 'steam.gpg' "$STEAM_BUILDS/archive/precise/steam.gpg"
-	#exit
 	#cat <<- EOT > $SOURCES_DIR/steam.list
 	#	deb     [signed-by=$TRUSTED_DIR/steam.gpg] $STEAM_BUILDS stable steam
 	#	deb-src [signed-by=$TRUSTED_DIR/steam.gpg] $STEAM_BUILDS stable steam
@@ -204,6 +206,8 @@ fi
 ######### Lutris
 if [[ ! -z "$DO_LUTRIS" ]]; then
 	echo '######### install Lutris'
+
+	rm $SOURCES_DIR/lutris.sources
 	LUTRIS_URL='https://download.opensuse.org/repositories/home:/strycore:/lutris/Debian_13'
 	#addPgpKey 'lutris.gpg' "$LUTRIS_URL/Release.key"
 	createSourceEntry 'lutris' 'deb' "$LUTRIS_URL/" './'
@@ -290,10 +294,7 @@ if [[ ! -z "$DO_OBS" ]]; then
 	#exit
 	dpkg -i $MULTIMEDIA_DRV
 
-	#echo <<- EOT > $SOURCES_DIR/deb-multimedia.list
-	#	deb $MULTIMEDIA_URL testing main non-free
-	#	#deb $MULTIMEDIA_URL testing-backports main
-	#EOT
+	rm $SOURCES_DIR/deb-multimedia.sources
 	createSourceEntry 'deb-multimedia' 'deb deb-src' "$MULTIMEDIA_URL/" 'testing' 'main'
 
 	apt update

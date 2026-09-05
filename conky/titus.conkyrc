@@ -68,9 +68,9 @@ conky.config = {
 	alignment = 'top_right',					-- top_left,top_middle,top_right,bottom_left,bottom_middle,bottom_right,
 										-- middle_left,middle_middle,middle_right,none
 	--Arch Duoscreen
-	--gap_x = -1910,
-	gap_x = 15,							-- pixels between right or left border
-	gap_y = 0,							-- pixels between bottom or left border
+	--gap_x = -1810,
+	--gap_x = 50,							-- pixels between right or left border
+	--gap_y = -1270,							-- pixels between bottom or left border
 	minimum_height = 600,					-- minimum height of window
 	minimum_width = 300,					-- minimum height of window
 	maximum_width = 300,					-- maximum height of window
@@ -152,8 +152,9 @@ ${color2}${voffset 8}Hostname:${color} ${alignr}${nodename}
 ${color2}Kernel:${color}${alignr}${exec uname} ${exec uname -r}
 ${color2}IP Address: ${color} ${alignr}${addrs bridge0}
 ${color5}${font}P R O C E S S O R S  ${hr 2}${font}${color}
+${color2}CPU:${color} ${alignr}${execi 1000 cat /proc/cpuinfo | grep 'model name' | sed -e 's/model name.*: //' | sed -e 's/ Processor//' | uniq}
 ${color2}CPU Freq:${color} $alignr${freq} MHz
-${color2}History:${color} ${alignr}${cpugraph 8,100}
+#${color2}History:${color} ${alignr}${cpugraph 8,100}
 ${color2}Top Processes${goto 222}cpu%${goto 274}mem%${color}
 ${voffset 4}     1  -  ${top name 1}${alignr}${goto 170} ${goto 222}${top cpu 1} ${goto 274}${top mem 1}
      2  -  ${top name 2}${alignr} ${goto 222}${top cpu 2} ${goto 274}${top mem 2}
@@ -170,11 +171,12 @@ ${voffset 4}     1  -  ${top_mem name 1}${alignr}${goto 170} ${goto 222}${top_me
      5  -  ${top_mem name 5}${alignr}${goto 170} ${goto 222}${top_mem cpu 5} ${goto 274}${top_mem mem 5}
 ${color5}${font}D R I V E S   ${hr 2}${font}${color}
 ${color2}root:${color}${alignr}${fs_used /} / ${fs_size /}${alignr}
-${color2}data:${color}${alignr}${fs_used /home/uwe/Data} / ${fs_size /home/uwe/Data}${alignr}
+${color2}data:${color}${alignr}${fs_used /mnt/data} / ${fs_size /mnt/data}${alignr}
+${color2}save:${color}${alignr}${fs_used /mnt/save} / ${fs_size /mnt/save}${alignr}
 #${color2}I/O Read:${color} ${alignr}${offset -10}${diskio_read /dev/nvme0n1p2}${alignr}${diskiograph_read nvme0n1p2 8,100}
 #${color2}I/O Write:${color} ${alignr}${offset -10}${diskio_write /dev/nvme0n1p2}${alignr}${diskiograph_write nvme0n1p2 8,100}
 ${color5}${font}G R A P H I C   ${hr 2}${font}${color}
-${color2}GPU:${color} ${alignr}${execp lspci | grep ' VGA ' | cut -d" " -f 12-15  | awk '{ print substr( $0, 2, length($0)-2 ) }'}
+${color2}GPU:${color} ${alignr}${execi 1000 lspci | grep ' VGA ' | cut -d" " -f 12-15  | awk '{ print substr( $0, 2, length($0)-2 ) }'}
 #${color2}Driver:${color} ${alignr}${execi 60000 nvidia-smi | grep "Driver Version"| awk {'print $3'}}
 #${color2}Fan Speed:${color} ${alignr}${execi 60 nvidia-settings -q [fan:0]/GPUCurrentFanSpeed -t} %
 #${color2}GPU Clock:${color} ${alignr}${execi 60 nvidia-settings -q GPUCurrentClockFreqs | grep -m 1 Attribute | awk '{print $4}' | sed -e 's/\.//' | cut -d, -f1} MHz
@@ -187,10 +189,13 @@ ${color2}Mem Used:${color} ${alignr}${execi 60 numfmt --to=iec < /sys/class/drm/
 #${color1}Mem${color}     ${exec numfmt --to=iec < /sys/class/drm/card0/device/mem_info_vram_used}
 #${color1}Fan${color}     ${hwmon 2 fan 1}
 ${color5}${font}T E M P E R A T U R   ${hr 2}${font}${color}
-${color2}CPU:${color} $alignr${execi 10 sensors | grep 'Tctl' | awk {'print $2'}}
-${color2}GPU:${color} ${alignr}${hwmon 2 temp 2} °C
-${color2}NVM root:${color}${alignr}${exec sudo /usr/sbin/nvme smart-log /dev/nvme0n1 | grep "^temperature" | cut -c18-19} °C${alignr}
-${color2}NVM data:${color}${alignr}${exec sudo /usr/sbin/nvme smart-log /dev/nvme1n1 | grep "^temperature" | cut -c18-19} °C${alignr}
+${color2}CPU:${color}${alignr}${execi 10      sensors k10temp-pci-00c3   | grep "Tctl"      | cut -c16-22}${alignr}
+${color2}GPU:${color}${alignr}${execi 10      sensors amdgpu-pci-0300    | grep "junction"  | cut -c16-22}${alignr}
+${color2}NVM root:${color}${alignr}${execi 10 sensors nvme-pci-1200      | grep "Composite" | cut -c16-22}${alignr}
+${color2}NVM data:${color}${alignr}${execi 10 sensors nvme-pci-0400      | grep "Composite" | cut -c16-22}${alignr}
+#${color2}SSD save:${color}${alignr}${execi 10 sensors acpitz-acpi-0      | grep "temp1"     | cut -c16-22}${alignr}
+${color2}D5 next:${color}${alignr}${execi 10  sensors d5next-hid-3-9     | grep "Coolant"   | cut -c21-27}${alignr}
+${color2}D5 next fan speed:${color}${alignr}${execi 10  sensors d5next-hid-3-9     | grep "Fan speed"   | cut -c19-27}${alignr}
 ${color5}${font}W E A T H E R   ${hr 2}${font}${color}
-${font Dejavu Sans Mono:size=10}${alignc}${color}${execpi 300 curl wttr.in/Nandlstadt?T0 --silent --max-time 3}${font}
+${font Dejavu Sans Mono:size=10}${alignc}${color}${execpi 300 curl wttr.in/Hermsdorf?T0 --silent --max-time 3}${font}
 ]];

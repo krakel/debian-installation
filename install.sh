@@ -116,7 +116,7 @@ SOURCES_NEW='/etc/apt/sources.list.d/debian.sources'
 SOURCES_DIR='/etc/apt/sources.list.d'
 
 TRUSTED_DIR='/etc/apt/trusted.gpg.d'
-KEY_RING_DIR='/usr/share/keyrings'
+KEY_RING_DIR='/etc/apt/keyrings'
 
 THIS_NAME=game
 THIS_IP=192.168.2.20
@@ -199,62 +199,15 @@ function createSudoCmd() {
 #####################################################################
 #####################################################################
 if [[ ! -z "$DO_SOURCE" ]]; then
-	if [[ -f $SOURCES_NEW ]]; then
-		SOURCES="$SOURCES_NEW"
-		BACKUP="$SOURCES_DIR/debian.sources.bak"
-		TMPFILE='/tmp/debian.sources'
-	elif [[ -f $SOURCES_OLD ]]; then
-		SOURCES="$SOURCES_OLD"
-		BACKUP='/etc/apt/sources.orig'
-		TMPFILE='/tmp/sources.list'
-	else
-		echo "bad, missing file: $SOURCES_OLD or $SOURCES_NEW"
-		exit 1
-	fi
-
-	if [[ -f $TMPFILE ]]; then
-		echo "delete old temp file: $TMPFILE"
-		rm -f $TMPFILE
-	fi
-	touch $TMPFILE
-
-	if [[ -f $SOURCES_NEW ]]; then
-		cat <<- EOT > $TMPFILE
-			Types: deb deb-src
-			URIs: http://deb.debian.org/debian/
-			Suites: testing
-			Components: main contrib non-free non-free-firmware
-			Signed-By: /usr/share/keyrings/debian-archive-keyring.gpg
-
-			Types: deb deb-src
-			URIs: http://deb.debian.org/debian/
-			Suites: testing-updates
-			Components: main contrib non-free non-free-firmware
-			Signed-By: /usr/share/keyrings/debian-archive-keyring.gpg
-
-			Types: deb deb-src
-			URIs: http://security.debian.org/debian-security/
-			Suites: testing-security
-			Components: main contrib non-free non-free-firmware
-			Signed-By: /usr/share/keyrings/debian-archive-keyring.gpg
-		EOT
-	else
-		cat <<- EOT > $TMPFILE
-			deb     http://deb.debian.org/debian               testing           main contrib non-free non-free-firmware
-			deb-src http://deb.debian.org/debian               testing           main contrib non-free non-free-firmware
-
-			deb     http://deb.debian.org/debian               testing-updates   main contrib non-free non-free-firmware
-			deb-src http://deb.debian.org/debian               testing-updates   main contrib non-free non-free-firmware
-
-			deb     http://security.debian.org/debian-security testing-security  main contrib non-free non-free-firmware
-			deb-src http://security.debian.org/debian-security testing-security  main contrib non-free non-free-firmware
-		EOT
-	fi
-
+	SOURCES="$SOURCES_DIR/debian.sources"
+	BACKUP="$SOURCES_DIR/debian.sources.bak"
 	if [[ ! -f $BACKUP ]]; then
 		mv $SOURCES $BACKUP
 	fi
-	mv $TMPFILE $SOURCES
+
+	createSourceEntry 'debian' 'deb deb-src' 'http://deb.debian.org/debian/' 'testing'          'main contrib non-free non-free-firmware' 'debian-archive-keyring.gpg'
+	createSourceEntry 'debian' 'deb deb-src' 'http://deb.debian.org/debian/' 'testing-updates'  'main contrib non-free non-free-firmware' 'debian-archive-keyring.gpg'
+	createSourceEntry 'debian' 'deb deb-src' 'http://deb.debian.org/debian/' 'testing-security' 'main contrib non-free non-free-firmware' 'debian-archive-keyring.gpg'
 
 	apt update
 fi
@@ -281,18 +234,13 @@ fi
 #####################################################################
 #####################################################################
 if [[ ! -z "$DO_SID" ]]; then
-	SOURCES="$SOURCES_DIR/sid.sources"
-	BACKUP="$SOURCES_DIR/sid.sources.bak"
-	if grep -F -q "sid" $SOURCES ; then
-		echo "Debian sid already installed!"
-		exit 1
+	SOURCES="$SOURCES_DIR/debian-sid.sources"
+	BACKUP="$SOURCES_DIR/debian-sid.sources.bak"
+	if [[ -f $SOURCES ]]; then
+		mv $SOURCES $BACKUP
 	fi
 
-	if [[ ! -f $BACKUP ]]; then
-		cp $SOURCES $BACKUP
-	fi
-
-	createSourceEntry 'chrome' 'deb deb-src' 'http://deb.debian.org/debian/' 'sid' 'main contrib non-free non-free-firmware' 'debian-archive-keyring.gpg'
+	createSourceEntry 'debian-sid' 'deb deb-src' 'http://deb.debian.org/debian/' 'sid' 'main contrib non-free non-free-firmware' 'debian-archive-keyring.gpg'
 
 	cat <<- EOT > /etc/apt/preferences.d/debian-sid
 		Package: *
@@ -310,41 +258,13 @@ fi
 #####################################################################
 #####################################################################
 if [[ ! -z "$DO_UNSTABLE" ]]; then
-	if [[ -f $SOURCES_NEW ]]; then
-		SOURCES="$SOURCES_NEW"
-		BACKUP="$SOURCES_DIR/debian.sources.bak"
-	elif [[ -f $SOURCES_OLD ]]; then
-		SOURCES="$SOURCES_OLD"
-		BACKUP='/etc/apt/sources.orig'
-	else
-		echo "bad, missing file: $SOURCES_OLD or $SOURCES_NEW"
-		exit 1
-	fi
-	if grep -F -q "unstable" $SOURCES ; then
-		echo "Debian unstable already installed!"
-		exit 1
+	SOURCES="$SOURCES_DIR/debian-unstable.sources"
+	BACKUP="$SOURCES_DIR/debian-unstable.sources.bak"
+	if [[ -f $SOURCES ]]; then
+		mv $SOURCES $BACKUP
 	fi
 
-	if [[ ! -f $BACKUP ]]; then
-		cp $SOURCES_OLD $BACKUP
-	fi
-
-	if [[ -f $SOURCES_NEW ]]; then
-			cat <<- EOT >> $SOURCES
-
-			Types: deb deb-src
-			URIs: http://deb.debian.org/debian/
-			Suites: unstable
-			Components: main contrib non-free
-			Signed-By: /usr/share/keyrings/debian-archive-keyring.gpg
-		EOT
-else
-		cat <<- EOT >> $SOURCES_OLD
-
-			deb     http://deb.debian.org/debian unstable main contrib non-free
-			deb-src http://deb.debian.org/debian unstable main contrib non-free
-		EOT
-	fi
+	createSourceEntry 'debian-unstable' 'deb deb-src' 'http://deb.debian.org/debian/' 'unstable' 'main contrib non-free' 'debian-archive-keyring.gpg'
 
 	cat <<- EOT > /etc/apt/preferences.d/debian-unstable
 		Package: *
@@ -1466,6 +1386,7 @@ fi
 if [[ ! -z "$DO_ETCHER" ]]; then
 	echo '######### install Etcher.io'
 
+	rm $SOURCES_DIR/etcher.sources
 	addPgpKey 'etcher.gpg' 'hkps://keyserver.ubuntu.com:443' '379CE192D401AB61'
 	#echo "deb [signed-by=$TRUSTED_DIR/etcher.gpg] https://deb.etcher.io stable etcher" > $SOURCES_DIR/etcher.list
 	createSourceEntry 'etcher' 'deb' 'https://deb.etcher.io/' 'stable' 'etcher'
@@ -1481,6 +1402,7 @@ if [[ ! -z "$DO_SEAFILE" ]]; then
 	echo '######### install Seafile driver'
 	SEAFILE_URL='https://linux-clients.seafile.com'
 
+	rm $SOURCES_DIR/seafile.sources
 	addPgpKey 'seafile.gpg' "$SEAFILE_URL/seafile.asc"
 	#echo "deb [arch=amd64 signed-by=$TRUSTED_DIR/seafile.gpg] $SEAFILE_URL/seafile-deb/bullseye/ stable main" > $SOURCES_DIR/seafile.list
 	createSourceEntry 'seafile' 'deb' "$SEAFILE_URL/seafile-deb/bullseye/" 'stable' 'main'

@@ -1,0 +1,221 @@
+option VBASupport 1
+
+function POWER_LEVEL(level as string, optional withULV) as integer
+	select case LCase(Trim(level))
+		case "ulv" : POWER_LEVEL = 0
+		case "lv"  : POWER_LEVEL = 1
+		case "mv"  : POWER_LEVEL = 2
+		case "hv"  : POWER_LEVEL = 3
+		case "ev"  : POWER_LEVEL = 4
+		case "iv"  : POWER_LEVEL = 5
+		case "luv" : POWER_LEVEL = 6
+		case "zpm" : POWER_LEVEL = 7
+		case "uv"  : POWER_LEVEL = 8
+		case "uhv" : POWER_LEVEL = 9
+		case "uev" : POWER_LEVEL = 10
+		case "uiv" : POWER_LEVEL = 11
+		case "uxv" : POWER_LEVEL = 12
+		case "opv" : POWER_LEVEL = 13
+		case else  : POWER_LEVEL = -10
+	end select
+	if isMissing(withULV) and POWER_LEVEL = 0 then
+		POWER_LEVEL = 1
+	end if
+end function
+
+function POWER_VOLT(level as string) as long
+	select case LCase(Trim(level))
+		case "ulv" : POWER_VOLT = 8
+		case "lv"  : POWER_VOLT = 32
+		case "mv"  : POWER_VOLT = 128
+		case "hv"  : POWER_VOLT = 512
+		case "ev"  : POWER_VOLT = 2048
+		case "iv"  : POWER_VOLT = 8192
+		case "luv" : POWER_VOLT = 32768
+		case "zpm" : POWER_VOLT = 131072
+		case "uv"  : POWER_VOLT = 524288
+		case "uhv" : POWER_VOLT = 2097152
+		case "uev" : POWER_VOLT = 8388608
+		case "uiv" : POWER_VOLT = 33554432
+		case "uxv" : POWER_VOLT = 134217728
+		case "opv" : POWER_VOLT = 536870912
+		case else  : POWER_VOLT = -10
+	end select
+end function
+
+function COIL_LEVEL(level as string) as integer
+	select case LCase(Trim(level))
+		case "cupro"     : COIL_LEVEL = 0
+		case "kanthal"   : COIL_LEVEL = 1
+		case "nichrome"  : COIL_LEVEL = 2
+		case "rtm"       : COIL_LEVEL = 3
+		case "hssg"      : COIL_LEVEL = 4
+		case "naquadah"  : COIL_LEVEL = 5
+		case "trinium"   : COIL_LEVEL = 6
+		case "tritanium" : COIL_LEVEL = 7
+		case "zalloy"    : COIL_LEVEL = 8
+		case "magmada"   : COIL_LEVEL = 9
+		case "abyssal"   : COIL_LEVEL = 10
+		case else        : COIL_LEVEL = -10
+	end select
+end function
+
+function PYROLYSE_SPEED(level as string) as double
+	select case LCase(Trim(level))
+		case "cupro"     : PYROLYSE_SPEED = 0.75
+		case "kanthal"   : PYROLYSE_SPEED = 1.0
+		case "nichrome"  : PYROLYSE_SPEED = 1.5
+		case "rtm"       : PYROLYSE_SPEED = 2.0
+		case "hssg"      : PYROLYSE_SPEED = 2.5
+		case "naquadah"  : PYROLYSE_SPEED = 3.0
+		case "trinium"   : PYROLYSE_SPEED = 3.5
+		case "tritanium" : PYROLYSE_SPEED = 4.0
+		case "zalloy"    : PYROLYSE_SPEED = 4.5
+		case "magmada"   : PYROLYSE_SPEED = 5.0
+		case "abyssal"   : PYROLYSE_SPEED = 5.5
+		case else        : PYROLYSE_SPEED = -10.0
+	end select
+end function
+
+function REACTOR_SPEED(level as string) as double
+	select case LCase(Trim(level))
+		case "cupro"     : REACTOR_SPEED = 0.75
+		case "kanthal"   : REACTOR_SPEED = 1.00
+		case "nichrome"  : REACTOR_SPEED = 1.25
+		case "rtm"       : REACTOR_SPEED = 1.50
+		case "hssg"      : REACTOR_SPEED = 1.75
+		case "naquadah"  : REACTOR_SPEED = 2.00
+		case "trinium"   : REACTOR_SPEED = 2.25
+		case "tritanium" : REACTOR_SPEED = 2.50
+		case "zalloy"    : REACTOR_SPEED = 2.75
+		case "magmada"   : REACTOR_SPEED = 3.00
+		case "abyssal"   : REACTOR_SPEED = 3.25
+		case else        : REACTOR_SPEED = -10.0
+	end select
+end function
+
+function MULTI_SPEED(level as string) as integer
+	select case LCase(Trim(level))
+		case "cupro"     : MULTI_SPEED = 32
+		case "kanthal"   : MULTI_SPEED = 64
+		case "nichrome"  : MULTI_SPEED = 64
+		case "rtm"       : MULTI_SPEED = 128
+		case "hssg"      : MULTI_SPEED = 128
+		case "naquadah"  : MULTI_SPEED = 256
+		case "trinium"   : MULTI_SPEED = 256
+		case "tritanium" : MULTI_SPEED = 512
+		case "zalloy"    : MULTI_SPEED = 768
+		case "magmada"   : MULTI_SPEED = 1024
+		case "abyssal"   : MULTI_SPEED = 1280
+		case else        : MULTI_SPEED = -10
+	end select
+end function
+
+function OVERCLOCKS(level as string, minLevel as string, optional withULV) as integer
+	OVERCLOCKS = POWER_LEVEL(level, withULV) - POWER_LEVEL(minLevel, withULV)
+end function
+
+function TIME_NORMAL_DIFF(level as string, minLevel as string, optional withULV) as double
+	TIME_NORMAL_DIFF = 2 ^ OVERCLOCKS(level, minLevel, withULV)
+end function
+
+function TIME_PERFECT_DIFF(level as string, minLevel as string, optional withULV) as double
+	TIME_PERFECT_DIFF = 4 ^ OVERCLOCKS(level, minLevel, withULV)
+end function
+
+function NORMAL_CALCULATED(time as double, level as string, minLevel as string, optional withULV) as double
+on local error resume next
+	NORMAL_CALCULATED = time / TIME_NORMAL_DIFF(level, minLevel, withULV)
+end function
+
+function PERFECT_CALCULATED(time as double, level as string, minLevel as string, optional withULV) as double
+on local error resume next
+	PERFECT_CALCULATED = time / TIME_PERFECT_DIFF(level, minLevel, withULV)
+end function
+
+function NORMAL_TIME(time as double, level as string, minLevel as string, optional withULV) as double
+	NORMAL_TIME = MINECRAFT_TIME(NORMAL_CALCULATED(time, level, minLevel, withULV))
+end function
+
+function PERFECT_TIME(time as double, level as string, minLevel as string, optional withULV) as double
+	PERFECT_TIME = MINECRAFT_TIME(PERFECT_CALCULATED(time, level, minLevel, withULV))
+end function
+
+function PYROLYSE_TIME(time as double, level as string, minLevel as string, coil as string) as double
+on local error resume next
+	PYROLYSE_TIME = MINECRAFT_TIME(NORMAL_CALCULATED(time, level, minLevel) / PYROLYSE_SPEED(coil))
+end function
+
+function REACTOR_TIME(time as double, level as string, minLevel as string, coil as string, optional para) as double
+on local error resume next
+	if isMissing(para) then
+		REACTOR_TIME = MINECRAFT_TIME(NORMAL_CALCULATED(time, level, minLevel) / REACTOR_SPEED(coil))
+	else
+		REACTOR_TIME = MINECRAFT_TIME(NORMAL_CALCULATED(time, level, minLevel) / REACTOR_SPEED(coil) * INT(SQR(para)))
+	end if
+end function
+
+function MULTI_TIME(time as double, level as string, minLevel as string, coil as string) as double
+on local error resume next
+	MULTI_TIME = MINECRAFT_TIME(NORMAL_CALCULATED(time, level, minLevel) / MULTI_SPEED(coil))
+end function
+
+function CAPABILITY(level as string, minLevel as string, amps as double) as long
+on local error resume next
+	CAPABILITY = INT(TIME_PERFECT_DIFF(level, minLevel, true) / amps)
+end function
+
+function PARALLEL_COUNT(level as string, minLevel as string, amps as double, para as long) as long
+	PARALLEL_COUNT = INT(MINIMUM(CAPABILITY(level, minLevel, amps), para))
+end function
+
+function PARALLEL_TIME(time as double, level as string, minLevel as string, para as long) as double
+on local error resume next
+	PARALLEL_TIME = MINECRAFT_TIME(NORMAL_CALCULATED(time, level, minLevel, withULV) * INT(SQR(para)))
+end function
+
+function ENERGY_LEVEL(level as integer) as string
+	select case level
+		case 0    : ENERGY_LEVEL = "ulv"
+		case 1    : ENERGY_LEVEL = "lv"
+		case 2    : ENERGY_LEVEL = "mv"
+		case 3    : ENERGY_LEVEL = "hv"
+		case 4    : ENERGY_LEVEL = "ev"
+		case 5    : ENERGY_LEVEL = "iv"
+		case 6    : ENERGY_LEVEL = "luv"
+		case 7    : ENERGY_LEVEL = "zpm"
+		case 8    : ENERGY_LEVEL = "uv"
+		case 9    : ENERGY_LEVEL = "uhv"
+		case 10   : ENERGY_LEVEL = "uev"
+		case 11   : ENERGY_LEVEL = "uiv"
+		case 12   : ENERGY_LEVEL = "uxv"
+		case 13   : ENERGY_LEVEL = "opv"
+		case else : ENERGY_LEVEL = "unknown"
+	end select
+end function
+
+function MINECRAFT_TIME(time as double) as double 
+	dim ticks as long
+	ticks = INT(time * 20)
+	if ticks <= 1 then
+		ticks = 1
+	end if
+	MINECRAFT_TIME = ticks / 20.0
+end function
+
+function UNIT_COUNT(count as double, unit as double) as double
+	dim res as long
+	res = INT(count / unit)
+	if res < 1 then
+		res = 1
+	end if
+	UNIT_COUNT = res * unit
+end function
+
+function ENERGY_BASE(energy as double) as string
+	ENERGY_BASE = ENERGY_LEVEL(CEILING(LOG(energy, 2)))
+end function
+
+function MINIMUM(x, y as variant) as variant
+   MINIMUM = IIF(x < y, x, y)
+end function

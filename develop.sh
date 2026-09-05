@@ -65,7 +65,7 @@ HOME_USER="/home/$SUDO_USER"
 
 SOURCES_DIR='/etc/apt/sources.list.d'
 TRUSTED_DIR='/etc/apt/trusted.gpg.d'
-KEY_RING_DIR='/usr/share/keyrings'
+KEY_RING_DIR='/etc/apt/keyrings'
 
 if [[ $(id -u) != 0 ]]; then
 	 echo
@@ -102,6 +102,7 @@ if [[ ! -z "$DO_JAVA" ]]; then
 	# https://www.oracle.com/java/technologies/javase-jdk8-downloads.html
 	# apt install oracle-java8-installer
 
+	rm $SOURCES_DIR/adoptium.sources
 	JFROG_BUILDS='https://packages.adoptium.net/artifactory'
 	addPgpKey 'adoptium.gpg' "$JFROG_BUILDS/api/gpg/key/public"
 	#echo "deb [signed-by=$TRUSTED_DIR/adoptium.gpg] $JFROG_BUILDS/deb/ bookworm main" > $SOURCES_DIR/adoptium.list
@@ -191,6 +192,7 @@ fi
 if [[ ! -z "$DO_SBT" ]]; then
 	echo '######### install sbt'
 
+	rm $SOURCES_DIR/sbt.sources
 	addPgpKey 'sbt.gpg' 'https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x2EE0EA64E40A89B84B2DF73499E82A75642AC823'
 	#echo "deb [signed-by=$TRUSTED_DIR/sbt.gpg] https://dl.bintray.com/sbt/debian /" > $SOURCES_DIR/sbt.list
 	createSourceEntry 'sbt' 'deb' 'https://dl.bintray.com/sbt/debian/' 'stable' 'main'
@@ -436,8 +438,8 @@ fi
 if [[ ! -z "$DO_SUBLIME" ]]; then
 	echo '######### install Sublime editor'
 
+	rm $SOURCES_DIR/sublime.sources
 	addPgpKey 'sublime.gpg' 'https://download.sublimetext.com/sublimehq-pub.gpg'
-	#exit
 	#echo "deb [signed-by=$TRUSTED_DIR/sublime.gpg] https://download.sublimetext.com/ apt/stable/" > $SOURCES_DIR/sublime.list
 	createSourceEntry 'sublime' 'deb' 'https://download.sublimetext.com/' 'stable' 'main'
 	apt update

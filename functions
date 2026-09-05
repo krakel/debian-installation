@@ -151,16 +151,16 @@ function addPgpKey() {
 		wget -nv $gpgFile -O - | apt-key add -
 	elif [[ -z "$gpgKey" ]]; then 			# new version
 		wget -nv $gpgServer -O - | gpg --no-default-keyring --keyring temp-keyring.gpg --import
-		gpg --no-default-keyring --keyring temp-keyring.gpg --export --output $KEY_RING_DIR/$gpgFile
-		gpg --export --keyring $KEY_RING_DIR/$gpgFile > $TRUSTED_DIR/$gpgFile
+		gpg --no-default-keyring --keyring temp-keyring.gpg --export --output $TRUSTED_DIR/$gpgFile
+		gpg --export --keyring $TRUSTED_DIR/$gpgFile > $KEY_RING_DIR/$gpgFile
 		#rm temp-keyring.gpg
 
-		#wget -nv $gpgServer -O - | gpg --no-default-keyring --keyring $KEY_RING_DIR/$gpgFile --import
-		#gpg --no-default-keyring --keyring $KEY_RING_DIR/$gpgFile --export > $TRUSTED_DIR/$gpgFile
+		#wget -nv $gpgServer -O - | gpg --no-default-keyring --keyring $TRUSTED_DIR/$gpgFile --import
+		#gpg --no-default-keyring --keyring $TRUSTED_DIR/$gpgFile --export > $KEY_RING_DIR/$gpgFile
 	else 												        # use a key server
-		gpg --no-default-keyring --keyring $KEY_RING_DIR/$gpgFile --keyserver $gpgServer --recv-keys $gpgKey
+		gpg --no-default-keyring --keyring $TRUSTED_DIR/$gpgFile --keyserver $gpgServer --recv-keys $gpgKey
 #		gpg --ignore-time-conflict --no-options --no-default-keyring --secret-keyring /tmp/tmp.rh1myoBdSE --trustdb-name /etc/apt/trustdb.gpg --keyring /etc/apt/trusted.gpg --primary-keyring /etc/apt/trusted.gpg --keyserver keyserver.ubuntu.com --recv 7F0CEB10
-		gpg --export --keyring $KEY_RING_DIR/$gpgFile > $TRUSTED_DIR/$gpgFile
+		gpg --export --keyring $TRUSTED_DIR/$gpgFile > $KEY_RING_DIR/$gpgFile
 	fi
 }
 
@@ -175,16 +175,13 @@ function createSourceEntry() {
 	if [[ -z "$entrySig" ]]; then
 		entrySig=$1.gpg
 	fi
-	if [[ ! -z "$entrySrc" ]]; then
-		rm -f $entrySrc
-	fi
 
 	cat <<- EOT >> $entrySrc
 		Types: $2
 		URIs: $3
 		Suites: $4
 		Components: $5
-		Signed-By: $TRUSTED_DIR/$entrySig
+		Signed-By: $KEY_RING_DIR/$entrySig
 		Architectures: amd64
 	EOT
 }

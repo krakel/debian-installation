@@ -62,7 +62,7 @@ dotnet45	.Net 4.5
 wine: Unhandled exception 0xe0434352 in thread 128 at address 7B012436 (thread 0128), starting debugger...
 
 
-ninja001@doerl.de 	Krakel001	!!Alter2000!!	demo118720	Gbt6R2$_
+ninja001@doerl.de   Krakel001	!!Alter2000!!	demo118720	Gbt6R2$_
 ninja002@doerl.de   Krakel002	!!Alter2000!!
 ninja003@doerl.de 								demo72590	At_6t@Q7
 ninja004@doerl.de 								demo148350	#_d2hT8P
